@@ -1,0 +1,10 @@
+% Autotester ID file. Add your student numbers and UTORids below in
+% the following order:
+1004948890
+lekeping
+1005116731
+ashipass
+% (without the % sign!)
+% Nothing else should appear on each line, and there should be no other
+% information in the file.
+

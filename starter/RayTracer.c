@@ -52,8 +52,8 @@ struct textureNode *texture_list;
 int MAX_DEPTH;
 
 void buildScene(void) {
-// #include "buildscene.c"  // <-- Import the scene definition!
-#include "buildCoolScene.c"
+#include "buildscene.c"  // <-- Import the scene definition!
+                         // #include "buildCoolScene.c"
 }
 
 void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
@@ -90,9 +90,9 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
     G = obj->col.G;
     B = obj->col.B;
   } else {
-    // Get object colour from the texture given the texture coordinates (a,b),
-    // and the texturing function for the object. Note that we will use textures
-    // also for Photon Mapping.
+    // Get object colour from the texture given the texture coordinates
+    // (a,b), and the texturing function for the object. Note that we will
+    // use textures also for Photon Mapping.
     obj->textureMap(obj->texImg, a, b, &R, &G, &B);
   }
 
@@ -128,18 +128,21 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
     tmp_col.G += G * obj->alb.ra;
     tmp_col.B += B * obj->alb.ra;
 
-    if (lambda <= 0 || lambda >= 1) {      
+    if (lambda <= 0 || lambda >= 1) {
       // Diffuse
       struct point3D s;
       copyPoint(&p_to_ls_d, &s);
       normalize(&s);
       double n_dot_s = dot(n, &s);
-      double n_dot_s_front_back = obj->frontAndBack ? abs(n_dot_s) : n_dot_s; 
+      double n_dot_s_front_back = obj->frontAndBack ? abs(n_dot_s) : n_dot_s;
 
-      tmp_col.R += R * obj->alb.rd * curr_light->col.R * max(0, n_dot_s_front_back);
-      tmp_col.G += G * obj->alb.rd * curr_light->col.G * max(0, n_dot_s_front_back);
-      tmp_col.B += B * obj->alb.rd * curr_light->col.B * max(0, n_dot_s_front_back);
-      
+      tmp_col.R +=
+          R * obj->alb.rd * curr_light->col.R * max(0, n_dot_s_front_back);
+      tmp_col.G +=
+          G * obj->alb.rd * curr_light->col.G * max(0, n_dot_s_front_back);
+      tmp_col.B +=
+          B * obj->alb.rd * curr_light->col.B * max(0, n_dot_s_front_back);
+
       // Specular
       struct point3D c;
       copyPoint(&ray->d, &c);
@@ -147,20 +150,22 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
       c.py *= -1;
       c.pz *= -1;
       normalize(&c);
-      
-      
+
       struct point3D m;
       copyPoint(n, &m);
       m.px *= 2 * n_dot_s;
       m.py *= 2 * n_dot_s;
       m.pz *= 2 * n_dot_s;
       subVectors(&s, &m);
-      
+
       double c_dot_m = dot(&c, &m);
 
-      tmp_col.R += obj->alb.rs * curr_light->col.R * pow(max(0, c_dot_m), obj->shinyness);
-      tmp_col.G += obj->alb.rs * curr_light->col.G * pow(max(0, c_dot_m), obj->shinyness);
-      tmp_col.B += obj->alb.rs * curr_light->col.B * pow(max(0, c_dot_m), obj->shinyness);
+      tmp_col.R += obj->alb.rs * curr_light->col.R *
+                   pow(max(0, c_dot_m), obj->shinyness);
+      tmp_col.G += obj->alb.rs * curr_light->col.G *
+                   pow(max(0, c_dot_m), obj->shinyness);
+      tmp_col.B += obj->alb.rs * curr_light->col.B *
+                   pow(max(0, c_dot_m), obj->shinyness);
     }
 
     // Global component
@@ -217,23 +222,24 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
 void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os,
                   struct object3D **obj, struct point3D *p, struct point3D *n,
                   double *a, double *b) {
-  // Find the closest intersection between the ray and any objects in the scene.
-  // Inputs:
+  // Find the closest intersection between the ray and any objects in the
+  // scene. Inputs:
   //   *ray    -  A pointer to the ray being traced
-  //   *Os     -  'Object source' is a pointer toward the object from which the
-  //   ray originates. It is used for reflected or refracted rays
+  //   *Os     -  'Object source' is a pointer toward the object from which
+  //   the ray originates. It is used for reflected or refracted rays
   //              so that you can check for and ignore self-intersections as
   //              needed. It is NULL for rays originating at the center of
   //              projection
   // Outputs:
-  //   *lambda -  A pointer toward a double variable 'lambda' used to return the
-  //   lambda at the intersection point
-  //   **obj   -  A pointer toward an (object3D *) variable so you can return a
-  //   pointer to the object that has the closest intersection with
+  //   *lambda -  A pointer toward a double variable 'lambda' used to return
+  //   the lambda at the intersection point
+  //   **obj   -  A pointer toward an (object3D *) variable so you can return
+  //   a pointer to the object that has the closest intersection with
   //              this ray (this is required so you can do the shading)
   //   *p      -  A pointer to a 3D point structure so you can store the
-  //   coordinates of the intersection point *n      -  A pointer to a 3D point
-  //   structure so you can return the normal at the intersection point *a, *b
+  //   coordinates of the intersection point *n      -  A pointer to a 3D
+  //   point structure so you can return the normal at the intersection point
+  //   *a, *b
   //   -  Pointers toward double variables so you can return the texture
   //   coordinates a,b at the intersection point
 
@@ -280,8 +286,8 @@ void rayTrace(struct ray3D *ray, int depth, struct colourRGB *col,
   // Parameters:
   //   *ray   -  A pointer to the ray being traced
   //   depth  -  Current recursion depth for recursive raytracing
-  //   *col   - Pointer to an RGB colour structure so you can return the object
-  //   colour
+  //   *col   - Pointer to an RGB colour structure so you can return the
+  //   object colour
   //            at the intersection point of this ray with the closest scene
   //            object.
   //   *Os    - 'Object source' is a pointer to the object from which the ray
@@ -342,10 +348,10 @@ int main(int argc, char *argv[]) {
   struct point3D g;
   struct point3D up;
   double du, dv;  // Increase along u and v directions for pixel coordinates
-  struct point3D pc, d;  // Point structures to keep the coordinates of a pixel
-                         // and the direction or a ray
-  struct ray3D ray;      // Structure to keep the ray from e to a pixel
-  struct colourRGB col;  // Return colour for raytraced pixels
+  struct point3D pc, d;         // Point structures to keep the coordinates of a
+                                // pixel and the direction or a ray
+  struct ray3D ray;             // Structure to keep the ray from e to a pixel
+  struct colourRGB col;         // Return colour for raytraced pixels
   struct colourRGB background;  // Background colour
   int i, j;                     // Counters for pixel coordinates
   unsigned char *rgbIm;
@@ -408,6 +414,14 @@ int main(int argc, char *argv[]) {
   //        to suit your scene.
   //////////////////////////////////////////
 
+  // Configuration for code to react differently based on antialiasing
+  // configuration
+  int antialiasing_division =
+      antialiasing ? ANTIALIASING_SAMPLES * ANTIALIASING_SAMPLES : 1;
+  // Equidistance points, reference:
+  // https://stackoverflow.com/questions/50797116/equally-spaced-elements-between-two-given-number
+  float antialiasing_step = antialiasing ? 2.0 / ANTIALIASING_SAMPLES : 3;
+
   // Mind the homogeneous coordinate w of all vectors below. DO NOT
   // forget to set it to 1, or you'll get junk out of the
   // geometric transformations later on.
@@ -441,9 +455,9 @@ int main(int argc, char *argv[]) {
   cam = setupView(&e, &g, &up, -1, -2, 2, 4);
 
   if (cam == NULL) {
-    fprintf(
-        stderr,
-        "Unable to set up the view and camera parameters. Our of memory!\n");
+    fprintf(stderr,
+            "Unable to set up the view and camera parameters. Our of "
+            "memory!\n");
     cleanup(object_list, light_list, texture_list);
     deleteImage(im);
     exit(0);
@@ -486,40 +500,66 @@ int main(int argc, char *argv[]) {
   {
     fprintf(stderr, "%d/%d, ", j, sx);
     for (i = 0; i < sx; i++) {
-      ///////////////////////////////////////////////////////////////////
-      // TO DO - complete the code that should be in this loop to do the
-      //         raytracing! (DONE)
-      ///////////////////////////////////////////////////////////////////
+      struct colourRGB pixel_col;
+      pixel_col.R = 0;
+      pixel_col.G = 0;
+      pixel_col.B = 0;
 
-      // Compute point pij
-      pc.px = cam->wl + i * du;
-      pc.py = cam->wt + j * dv;
-      pc.pz = -1;
-      pc.pw = 1;
-      matVecMult(cam->C2W, &pc);
+      // Perform antialiasing
+      for (float al_i = -1; al_i <= 1; al_i += antialiasing_step) {
+        for (float al_j = -1; al_j <= 1; al_j += antialiasing_step) {
+          // Zero-valued sample causes weird behaviour
+          if (al_i == 0 || al_j == 0) continue;
 
-      // Compute direction d
-      d.px = cam->wl + i * du;
-      d.py = cam->wt + j * dv;
-      d.pz = -1;
-      d.pw = 0;
-      matVecMult(cam->C2W, &d);
-      normalize(&d);
+          // Compute point pij
+          pc.px = cam->wl + i * du;
+          pc.py = cam->wt + j * dv;
 
-      // Compute ray
-      initRay(&ray, &pc, &d);
-      col = background;
+          // point Offset for antialiasing
+          if (antialiasing) {
+            pc.px += du / (ANTIALIASING_SAMPLES * al_i);
+            pc.py += dv / (ANTIALIASING_SAMPLES * al_j);
+          }
 
-      // Perform raytracing
-      rayTrace(&ray, 0, &col, NULL);
+          pc.pz = -1;
+          pc.pw = 1;
+          matVecMult(cam->C2W, &pc);
+
+          // Compute direction d
+          d.px = cam->wl + i * du;
+          d.py = cam->wt + j * dv;
+
+          // direction offset for antialiasing
+          if (antialiasing) {
+            d.px += du / (ANTIALIASING_SAMPLES * al_i);
+            d.py += dv / (ANTIALIASING_SAMPLES * al_j);
+          }
+
+          d.pz = -1;
+          d.pw = 0;
+          matVecMult(cam->C2W, &d);
+          normalize(&d);
+
+          // Compute ray
+          initRay(&ray, &pc, &d);
+          col = background;
+
+          // Perform raytracing
+          rayTrace(&ray, 0, &col, NULL);
+
+          pixel_col.R += col.R / antialiasing_division;
+          pixel_col.G += col.G / antialiasing_division;
+          pixel_col.B += col.B / antialiasing_division;
+        }
+      }
 
       // Calculate current pixel index
       int curr_pixel = (i + j * sx) * 3;
 
       // Update pixels in image
-      *(rgbIm + curr_pixel) = (unsigned char)(col.R * 255.0);
-      *(rgbIm + curr_pixel + 1) = (unsigned char)(col.G * 255.0);
-      *(rgbIm + curr_pixel + 2) = (unsigned char)(col.B * 255.0);
+      *(rgbIm + curr_pixel) = (unsigned char)(pixel_col.R * 255.0);
+      *(rgbIm + curr_pixel + 1) = (unsigned char)(pixel_col.G * 255.0);
+      *(rgbIm + curr_pixel + 2) = (unsigned char)(pixel_col.B * 255.0);
     }  // end for i
   }    // end for j
 

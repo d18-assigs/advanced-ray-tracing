@@ -402,6 +402,9 @@ void * renderThreadFunc(void *vargp){
   struct renderThreadArg *args = (struct renderThreadArg *)vargp;
   struct view *cam = args->cam;
   int sx = args->sx;
+  int antialiasing = args->antialiasing;
+  double antialiasing_division = args->antialiasing_division;
+  double antialiasing_step = args->antialiasing_step;
   double du = args->du;
   double dv = args->dv;
   struct colourRGB background;
@@ -423,13 +426,30 @@ void * renderThreadFunc(void *vargp){
   {
     printf("thread %d: %d/%d\n",args->thread_num,j-start_y,end_y-start_y);
     for (int i = 0; i < sx; i++) {
+      struct colourRGB pixel_col;
+      pixel_col.R = 0;
+      pixel_col.G = 0;
+      pixel_col.B = 0;
 
-      // Compute point pij
-      pc.px = cam->wl + i * du;
-      pc.py = cam->wt + j * dv;
-      pc.pz = -1;
-      pc.pw = 1;
-      matVecMult(cam->C2W, &pc);
+      // Perform antialiasing
+      for (float al_i = -1; al_i <= 1; al_i += antialiasing_step) {
+        for (float al_j = -1; al_j <= 1; al_j += antialiasing_step) {
+          // Zero-valued sample causes weird behaviour
+          if (al_i == 0 || al_j == 0) continue;
+
+          // Compute point pij
+          pc.px = cam->wl + i * du;
+          pc.py = cam->wt + j * dv;
+
+          // point Offset for antialiasing
+          if (antialiasing) {
+            pc.px += du / (ANTIALIASING_SAMPLES * al_i);
+            pc.py += dv / (ANTIALIASING_SAMPLES * al_j);
+          }
+
+          pc.pz = -1;
+          pc.pw = 1;
+          matVecMult(cam->C2W, &pc);
 
       // Compute direction d
       d.px = cam->wl + i * du;
@@ -439,20 +459,26 @@ void * renderThreadFunc(void *vargp){
       matVecMult(cam->C2W, &d);
       normalize(&d);
 
-      // Compute ray
-      initRay(&ray, &pc, &d);
-      col = background;
+          // Compute ray
+          initRay(&ray, &pc, &d);
+          col = background;
 
-      // Perform raytracing
-      rayTrace(&ray, 0, &col, NULL);
+          // Perform raytracing
+          rayTrace(&ray, 0, &col, NULL);
+
+          pixel_col.R += col.R / antialiasing_division;
+          pixel_col.G += col.G / antialiasing_division;
+          pixel_col.B += col.B / antialiasing_division;
+        }
+      }
 
       // Calculate current pixel index
       int curr_pixel = (i + j * sx) * 3;
-      
+
       // Update pixels in image
-      *(rgbIm + curr_pixel) = (unsigned char)(col.R * 255.0);
-      *(rgbIm + curr_pixel + 1) = (unsigned char)(col.G * 255.0);
-      *(rgbIm + curr_pixel + 2) = (unsigned char)(col.B * 255.0);
+      *(rgbIm + curr_pixel) = (unsigned char)(pixel_col.R * 255.0);
+      *(rgbIm + curr_pixel + 1) = (unsigned char)(pixel_col.G * 255.0);
+      *(rgbIm + curr_pixel + 2) = (unsigned char)(pixel_col.B * 255.0);
     }  // end for i
   }    // end for j
 
@@ -633,65 +659,65 @@ int main(int argc, char *argv[]) {
   fprintf(stderr, "\n");
 
   fprintf(stderr, "Rendering row: ");
-  for (j = 0; j < sx; j++)  // For each of the pixels in the image
-  {
-    fprintf(stderr, "%d/%d, ", j, sx);
-    for (i = 0; i < sx; i++) {
-      struct colourRGB pixel_col;
-      pixel_col.R = 0;
-      pixel_col.G = 0;
-      pixel_col.B = 0;
+  // for (j = 0; j < sx; j++)  // For each of the pixels in the image
+  // {
+  //   fprintf(stderr, "%d/%d, ", j, sx);
+  //   for (i = 0; i < sx; i++) {
+  //     struct colourRGB pixel_col;
+  //     pixel_col.R = 0;
+  //     pixel_col.G = 0;
+  //     pixel_col.B = 0;
 
-      // Perform antialiasing
-      for (float al_i = -1; al_i <= 1; al_i += antialiasing_step) {
-        for (float al_j = -1; al_j <= 1; al_j += antialiasing_step) {
-          // Zero-valued sample causes weird behaviour
-          if (al_i == 0 || al_j == 0) continue;
+  //     // Perform antialiasing
+  //     for (float al_i = -1; al_i <= 1; al_i += antialiasing_step) {
+  //       for (float al_j = -1; al_j <= 1; al_j += antialiasing_step) {
+  //         // Zero-valued sample causes weird behaviour
+  //         if (al_i == 0 || al_j == 0) continue;
 
-          // Compute point pij
-          pc.px = cam->wl + i * du;
-          pc.py = cam->wt + j * dv;
+  //         // Compute point pij
+  //         pc.px = cam->wl + i * du;
+  //         pc.py = cam->wt + j * dv;
 
-          // point Offset for antialiasing
-          if (antialiasing) {
-            pc.px += du / (ANTIALIASING_SAMPLES * al_i);
-            pc.py += dv / (ANTIALIASING_SAMPLES * al_j);
-          }
+  //         // point Offset for antialiasing
+  //         if (antialiasing) {
+  //           pc.px += du / (ANTIALIASING_SAMPLES * al_i);
+  //           pc.py += dv / (ANTIALIASING_SAMPLES * al_j);
+  //         }
 
-          pc.pz = -1;
-          pc.pw = 1;
-          matVecMult(cam->C2W, &pc);
+  //         pc.pz = -1;
+  //         pc.pw = 1;
+  //         matVecMult(cam->C2W, &pc);
 
-      // Compute direction d
-      d.px = cam->wl + i * du;
-      d.py = cam->wt + j * dv;
-      d.pz = -1;
-      d.pw = 0;
-      matVecMult(cam->C2W, &d);
-      normalize(&d);
+  //     // Compute direction d
+  //     d.px = cam->wl + i * du;
+  //     d.py = cam->wt + j * dv;
+  //     d.pz = -1;
+  //     d.pw = 0;
+  //     matVecMult(cam->C2W, &d);
+  //     normalize(&d);
 
-          // Compute ray
-          initRay(&ray, &pc, &d);
-          col = background;
+  //         // Compute ray
+  //         initRay(&ray, &pc, &d);
+  //         col = background;
 
-          // Perform raytracing
-          rayTrace(&ray, 0, &col, NULL);
+  //         // Perform raytracing
+  //         rayTrace(&ray, 0, &col, NULL);
 
-          pixel_col.R += col.R / antialiasing_division;
-          pixel_col.G += col.G / antialiasing_division;
-          pixel_col.B += col.B / antialiasing_division;
-        }
-      }
+  //         pixel_col.R += col.R / antialiasing_division;
+  //         pixel_col.G += col.G / antialiasing_division;
+  //         pixel_col.B += col.B / antialiasing_division;
+  //       }
+  //     }
 
-      // Calculate current pixel index
-      int curr_pixel = (i + j * sx) * 3;
+  //     // Calculate current pixel index
+  //     int curr_pixel = (i + j * sx) * 3;
 
-      // Update pixels in image
-      *(rgbIm + curr_pixel) = (unsigned char)(pixel_col.R * 255.0);
-      *(rgbIm + curr_pixel + 1) = (unsigned char)(pixel_col.G * 255.0);
-      *(rgbIm + curr_pixel + 2) = (unsigned char)(pixel_col.B * 255.0);
-    }  // end for i
-  }    // end for j
+  //     // Update pixels in image
+  //     *(rgbIm + curr_pixel) = (unsigned char)(pixel_col.R * 255.0);
+  //     *(rgbIm + curr_pixel + 1) = (unsigned char)(pixel_col.G * 255.0);
+  //     *(rgbIm + curr_pixel + 2) = (unsigned char)(pixel_col.B * 255.0);
+  //   }  // end for i
+  // }    // end for j
   
   pthread_t pthreads[thread_count];
    struct renderThreadArg *argss[thread_count];
@@ -706,6 +732,8 @@ int main(int argc, char *argv[]) {
      argss[i] = threadArgs;
      threadArgs-> thread_num = i;
      threadArgs->antialiasing =antialiasing;
+     threadArgs->antialiasing_division = antialiasing_division;
+     threadArgs->antialiasing_step = antialiasing_step;
      threadArgs->cam = cam;
      threadArgs->du = du;
      threadArgs->dv = dv;

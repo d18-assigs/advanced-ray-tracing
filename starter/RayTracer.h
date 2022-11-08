@@ -183,12 +183,6 @@ struct areaLS{
 	struct areaLS *next;
 };
 
-struct areaLS{
-	struct object3D *light_shape;
-	int k_sample;
-	struct areaLS *next;
-};
-
 /*
    The structure below is used to hold camera parameters. You will need
    to write code to initialize the camera position and orientation.
@@ -235,28 +229,13 @@ struct renderThreadArg{
   double du, dv;  // Increase along u and v directions for pixel coordinates
   struct colourRGB *background;  // Background colour
   unsigned char *rgbIm;
+
+
+  // antialiasing
+  double antialiasing_step;
+  double antialiasing_division;
 };
 
 // render thread func
 void * renderThreadFunc(void *vargp);
-
-// MultiThreading
-
-// render func render arguments
-struct renderThreadArg{
-  int thread_num;	
-  struct view *cam;  // Camera and view for this scene
-  int sx;            // Size of the raytraced image
-  int start_y;		 // Start of responsable ys
-  int end_y;	     // End of responsbale ys
-  int antialiasing;  // Flag to determine whether antialiaing is enabled or
-                     // disabled
-  double du, dv;  // Increase along u and v directions for pixel coordinates
-  struct colourRGB *background;  // Background colour
-  unsigned char *rgbIm;
-};
-
-// render thread func
-void * renderThreadFunc(void *vargp);
-
 #endif

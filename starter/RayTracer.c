@@ -46,14 +46,15 @@
 
 // A couple of global structures and data: An object list, a light list, and the
 // maximum recursion depth
-struct object3D *object_list;
-struct pointLS *light_list;
+struct object3D *object_list = NULL;
+struct pointLS *light_list = NULL;
+struct areaLS *aLS_list = NULL;
 struct textureNode *texture_list;
 int MAX_DEPTH;
 
 void buildScene(void) {
 #include "buildscene.c"  // <-- Import the scene definition!
-                         // #include "buildCoolScene.c"
+// #include "buildCoolScene.c"
 }
 
 void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
@@ -78,11 +79,22 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
   struct colourRGB tmp_col;  // Accumulator for colour components
   double R, G, B;            // Colour for the object in R G and B
 
+  if (obj->isLightSource)
+  {
+    col->R = obj->col.R;
+    col->G = obj->col.G;
+    col->B = obj->col.B;
+    return;
+  }
+  
+
   // This will hold the colour as we process all the components of
   // the Phong illumination model
   tmp_col.R = 0;
   tmp_col.G = 0;
   tmp_col.B = 0;
+
+
 
   if (obj->texImg == NULL)  // Not textured, use object colour
   {
@@ -105,10 +117,10 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
   double lambda = -1;
   double tmp_a, tmp_b;
   struct object3D *tmp_obj;
-  struct point3D tmp_p;
-  struct point3D tmp_n;
+  struct point3D tmp_p,tmp_n,s,m,c;
+  double c_dot_m,n_dot_s,n_dot_s_front_back;
 
-  // Perform shading based on each light
+  // PLS coponent
   struct pointLS *curr_light = light_list;
   while (curr_light != NULL) {
     // Calculate p_to_ls (ray from p to light source)
@@ -130,11 +142,10 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
 
     if (lambda <= 0 || lambda >= 1) {
       // Diffuse
-      struct point3D s;
       copyPoint(&p_to_ls_d, &s);
       normalize(&s);
-      double n_dot_s = dot(n, &s);
-      double n_dot_s_front_back = obj->frontAndBack ? abs(n_dot_s) : n_dot_s;
+      n_dot_s = dot(n, &s);
+      n_dot_s_front_back = obj->frontAndBack ? abs(n_dot_s) : n_dot_s; 
 
       tmp_col.R +=
           R * obj->alb.rd * curr_light->col.R * max(0, n_dot_s_front_back);
@@ -144,21 +155,19 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
           B * obj->alb.rd * curr_light->col.B * max(0, n_dot_s_front_back);
 
       // Specular
-      struct point3D c;
       copyPoint(&ray->d, &c);
       c.px *= -1;
       c.py *= -1;
       c.pz *= -1;
       normalize(&c);
-
-      struct point3D m;
+      
       copyPoint(n, &m);
       m.px *= 2 * n_dot_s;
       m.py *= 2 * n_dot_s;
       m.pz *= 2 * n_dot_s;
       subVectors(&s, &m);
-
-      double c_dot_m = dot(&c, &m);
+      
+      c_dot_m = dot(&c, &m);
 
       tmp_col.R += obj->alb.rs * curr_light->col.R *
                    pow(max(0, c_dot_m), obj->shinyness);
@@ -168,51 +177,105 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
                    pow(max(0, c_dot_m), obj->shinyness);
     }
 
-    // Global component
-    if (depth < MAX_DEPTH) {
-      // Specular reflection
-      if (obj->alb.rs != 0) {
-        // 2n.d
-        double two_n_dot_d = 2 * dot(n, &ray->d);
-
-        // (2n.d)n
-        struct point3D ms_d;
-        copyPoint(n, &ms_d);
-        ms_d.px *= two_n_dot_d;
-        ms_d.py *= two_n_dot_d;
-        ms_d.pz *= two_n_dot_d;
-        ms_d.pw = 1;
-
-        // d - (2n.d)n
-        subVectors(&ray->d, &ms_d);
-        ms_d.px *= -1;
-        ms_d.py *= -1;
-        ms_d.pz *= -1;
-        normalize(&ms_d);
-
-        // Build ms ray
-        struct ray3D ms;
-        initRay(&ms, p, &ms_d);
-
-        // Perform raytracing using ms
-        struct colourRGB c;
-        rayTrace(&ms, depth + 1, &c, obj);
-
-        // Update pixel colour
-        tmp_col.R += c.R * obj->alb.rg;
-        tmp_col.G += c.G * obj->alb.rg;
-        tmp_col.B += c.B * obj->alb.rg;
-      }
-
-      // Refraction
-      if (obj->alpha < 1) {
-        // TODO: A3
-      }
-    }
-
     curr_light = curr_light->next;
   }
 
+  
+  // ALS component
+  struct areaLS *curr_aLS = aLS_list;
+  while (curr_aLS != NULL){
+    tmp_col.R += R * obj->alb.ra;
+    tmp_col.G += G * obj->alb.ra;
+    tmp_col.B += B * obj->alb.ra;
+    struct point3D p_to_als_d;
+    struct object3D *curr_shape = curr_aLS->light_shape;
+    for (size_t i = 0; i < curr_aLS->k_sample; i++)
+    {
+      double x,y,z;
+      curr_shape->randomPoint(curr_shape,&x,&y,&z);
+      p_to_als_d.px = x;
+      p_to_als_d.py = y;
+      p_to_als_d.pz = z;
+      p_to_als_d.pw = 1;
+      subVectors(p,&p_to_als_d);
+      normalize(&p_to_als_d);
+
+      struct ray3D r_p_to_als;
+      initRay(&r_p_to_als,p,&p_to_als_d);
+
+      tmp_obj = NULL;
+      lambda = -1;
+      findFirstHit(&r_p_to_als,&lambda,obj,&tmp_obj, &tmp_p, &tmp_n, &tmp_a,
+                 &tmp_b);
+
+      if (tmp_obj != NULL && tmp_obj->isLightSource){
+        copyPoint(&p_to_als_d, &s);
+        normalize(&s);
+        n_dot_s = dot(n, &s);
+        n_dot_s_front_back = obj->frontAndBack ? abs(n_dot_s) : n_dot_s; 
+
+        tmp_col.R += R * obj->alb.rd * curr_aLS->light_shape->col.R * max(0, n_dot_s_front_back)/curr_aLS->k_sample;
+        tmp_col.G += G * obj->alb.rd * curr_aLS->light_shape->col.G * max(0, n_dot_s_front_back)/curr_aLS->k_sample;
+        tmp_col.B += B * obj->alb.rd * curr_aLS->light_shape->col.B * max(0, n_dot_s_front_back)/curr_aLS->k_sample;
+
+        // Specular
+        copyPoint(&ray->d, &c);
+        c.px *= -1;
+        c.py *= -1;
+        c.pz *= -1;
+        normalize(&c);
+
+        copyPoint(n, &m);
+        m.px *= 2 * n_dot_s;
+        m.py *= 2 * n_dot_s;
+        m.pz *= 2 * n_dot_s;
+        subVectors(&s, &m);
+
+        c_dot_m = dot(&c, &m);
+
+        tmp_col.R += (obj->alb.rs * curr_aLS->light_shape->col.R * pow(max(0, c_dot_m), obj->shinyness))/curr_aLS->k_sample;
+        tmp_col.G += (obj->alb.rs * curr_aLS->light_shape->col.G * pow(max(0, c_dot_m), obj->shinyness))/curr_aLS->k_sample;
+        tmp_col.B += (obj->alb.rs * curr_aLS->light_shape->col.B * pow(max(0, c_dot_m), obj->shinyness))/curr_aLS->k_sample;
+      }
+    }
+    curr_aLS = curr_aLS->next;
+  }
+
+  // Global Component
+  if (depth < MAX_DEPTH) {
+    // Specular reflection
+    if (obj->alb.rs != 0) {
+      // 2n.d
+      double two_n_dot_d = 2 * dot(n, &ray->d);
+      // (2n.d)n
+      struct point3D ms_d;
+      copyPoint(n, &ms_d);
+      ms_d.px *= two_n_dot_d;
+      ms_d.py *= two_n_dot_d;
+      ms_d.pz *= two_n_dot_d;
+      ms_d.pw = 1;
+      // d - (2n.d)n
+      subVectors(&ray->d, &ms_d);
+      ms_d.px *= -1;
+      ms_d.py *= -1;
+      ms_d.pz *= -1;
+      normalize(&ms_d);
+      // Build ms ray
+      struct ray3D ms;
+      initRay(&ms, p, &ms_d);
+      // Perform raytracing using ms
+      struct colourRGB c;
+      rayTrace(&ms, depth + 1, &c, obj);
+      // Update pixel colour
+      tmp_col.R += c.R * obj->alb.rg;
+      tmp_col.G += c.G * obj->alb.rg;
+      tmp_col.B += c.B * obj->alb.rg;
+    }
+    // Refraction
+    if (obj->alpha < 1) {
+      // TODO: A3
+    }
+  }
   // Update colour
   col->R = min(tmp_col.R, 1);
   col->G = min(tmp_col.G, 1);
@@ -333,6 +396,69 @@ void rayTrace(struct ray3D *ray, int depth, struct colourRGB *col,
   }
 }
 
+
+void * renderThreadFunc(void *vargp){
+  
+  struct renderThreadArg *args = (struct renderThreadArg *)vargp;
+  struct view *cam = args->cam;
+  int sx = args->sx;
+  double du = args->du;
+  double dv = args->dv;
+  struct colourRGB background;
+  background.B = 0;
+  background.G = 0;
+  background.R = 0;
+  unsigned char *rgbIm = args->rgbIm;
+
+  int thread_num = args->thread_num;
+
+  int start_y = args->start_y;
+  int end_y = args->end_y;
+
+  struct point3D pc, d;
+  struct colourRGB col;
+  struct ray3D ray;
+
+  for (int j = start_y; j < end_y; j++)  // For each of the pixels in the image
+  {
+    printf("thread %d: %d/%d\n",args->thread_num,j-start_y,end_y-start_y);
+    for (int i = 0; i < sx; i++) {
+
+      // Compute point pij
+      pc.px = cam->wl + i * du;
+      pc.py = cam->wt + j * dv;
+      pc.pz = -1;
+      pc.pw = 1;
+      matVecMult(cam->C2W, &pc);
+
+      // Compute direction d
+      d.px = cam->wl + i * du;
+      d.py = cam->wt + j * dv;
+      d.pz = -1;
+      d.pw = 0;
+      matVecMult(cam->C2W, &d);
+      normalize(&d);
+
+      // Compute ray
+      initRay(&ray, &pc, &d);
+      col = background;
+
+      // Perform raytracing
+      rayTrace(&ray, 0, &col, NULL);
+
+      // Calculate current pixel index
+      int curr_pixel = (i + j * sx) * 3;
+      
+      // Update pixels in image
+      *(rgbIm + curr_pixel) = (unsigned char)(col.R * 255.0);
+      *(rgbIm + curr_pixel + 1) = (unsigned char)(col.G * 255.0);
+      *(rgbIm + curr_pixel + 2) = (unsigned char)(col.B * 255.0);
+    }  // end for i
+  }    // end for j
+
+  return NULL;
+}
+
 int main(int argc, char *argv[]) {
   // Main function for the raytracer. Parses input parameters,
   // sets up the initial blank image, and calls the functions
@@ -356,9 +482,11 @@ int main(int argc, char *argv[]) {
   int i, j;                     // Counters for pixel coordinates
   unsigned char *rgbIm;
 
+  int thread_count = 1;
+
   if (argc < 5) {
     fprintf(stderr, "RayTracer: Can not parse input parameters\n");
-    fprintf(stderr, "USAGE: RayTracer size rec_depth antialias output_name\n");
+    fprintf(stderr, "USAGE: RayTracer size rec_depth antialias output_name (optional: thread_count)\n");
     fprintf(stderr, "   size = Image size (both along x and y)\n");
     fprintf(stderr, "   rec_depth = Recursion depth\n");
     fprintf(stderr,
@@ -366,6 +494,11 @@ int main(int argc, char *argv[]) {
             "else enables antialiasing\n");
     fprintf(stderr,
             "   output_name = Name of the output file, e.g. MyRender.ppm\n");
+    fprintf(stderr,
+            "   thread_count = number of render thread, defaults to 1\n");
+    
+    
+            
     exit(0);
   }
   sx = atoi(argv[1]);
@@ -375,7 +508,11 @@ int main(int argc, char *argv[]) {
   else
     antialiasing = 1;
   strcpy(&output_name[0], argv[4]);
+  
+  if (argc == 6 && atoi(argv[5]) > 0)
+      thread_count = atoi(argv[5]);
 
+  
   fprintf(stderr, "Rendering image at %d x %d\n", sx, sx);
   fprintf(stderr, "Recursion depth = %d\n", MAX_DEPTH);
   if (!antialiasing)
@@ -455,10 +592,10 @@ int main(int argc, char *argv[]) {
   cam = setupView(&e, &g, &up, -1, -2, 2, 4);
 
   if (cam == NULL) {
-    fprintf(stderr,
-            "Unable to set up the view and camera parameters. Our of "
-            "memory!\n");
-    cleanup(object_list, light_list, texture_list);
+    fprintf(
+        stderr,
+        "Unable to set up the view and camera parameters. Our of memory!\n");
+    cleanup(object_list, light_list, texture_list, aLS_list);
     deleteImage(im);
     exit(0);
   }
@@ -525,20 +662,13 @@ int main(int argc, char *argv[]) {
           pc.pw = 1;
           matVecMult(cam->C2W, &pc);
 
-          // Compute direction d
-          d.px = cam->wl + i * du;
-          d.py = cam->wt + j * dv;
-
-          // direction offset for antialiasing
-          if (antialiasing) {
-            d.px += du / (ANTIALIASING_SAMPLES * al_i);
-            d.py += dv / (ANTIALIASING_SAMPLES * al_j);
-          }
-
-          d.pz = -1;
-          d.pw = 0;
-          matVecMult(cam->C2W, &d);
-          normalize(&d);
+      // Compute direction d
+      d.px = cam->wl + i * du;
+      d.py = cam->wt + j * dv;
+      d.pz = -1;
+      d.pw = 0;
+      matVecMult(cam->C2W, &d);
+      normalize(&d);
 
           // Compute ray
           initRay(&ray, &pc, &d);
@@ -562,15 +692,53 @@ int main(int argc, char *argv[]) {
       *(rgbIm + curr_pixel + 2) = (unsigned char)(pixel_col.B * 255.0);
     }  // end for i
   }    // end for j
+  
+  pthread_t pthreads[thread_count];
+   struct renderThreadArg *argss[thread_count];
+   int start_y = 0;
+   int steps = sx / thread_count;
+   int remainder = sx % thread_count;
 
+  //  splits the image to render into thread_num chunks
+   for (i = 0; i < thread_count; i++)
+   {
+     struct renderThreadArg *threadArgs = (struct renderThreadArg *) malloc(sizeof(struct renderThreadArg));
+     argss[i] = threadArgs;
+     threadArgs-> thread_num = i;
+     threadArgs->antialiasing =antialiasing;
+     threadArgs->cam = cam;
+     threadArgs->du = du;
+     threadArgs->dv = dv;
+     threadArgs->end_y = i == thread_count - 1 ? start_y + steps + remainder : start_y + steps;
+     threadArgs->start_y = start_y;
+     threadArgs->rgbIm = rgbIm;
+     threadArgs->sx = sx;
+     start_y += steps;
+     printf("\n\n********* running thread %d ********* \n\n", i + 1);
+     pthread_create(&pthreads[i],NULL,renderThreadFunc,
+         (void *) threadArgs);
+   }
+   
+  //  wait for child threads to finish
+   for ( i = 0; i < thread_count; i++)
+   {
+     pthread_join(pthreads[i],NULL);
+     printf("thread %d exited\n",i);
+   }
+   
+   for(i = 0 ; i < thread_count;i++){
+     printf("freeing function args %d\n",i);
+     free(argss[i]);
+   }
   fprintf(stderr, "\nDone!\n");
 
   // Output rendered image
+  printf("%s\n",output_name);
   imageOutput(im, output_name);
 
   // Exit section. Clean up and return.
   cleanup(object_list, light_list,
-          texture_list);  // Object, light, and texture lists
+          texture_list, aLS_list);  // Object, light, and texture lists
   deleteImage(im);        // Rendered image
   free(cam);              // camera view
   exit(0);

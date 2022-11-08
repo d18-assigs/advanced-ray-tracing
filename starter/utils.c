@@ -177,7 +177,6 @@ void insertObject(struct object3D *o, struct object3D **list)
     (*(list))->next = o;
   }
 }
-
 struct object3D *newPlane(double ra, double rd, double rs, double rg, double r,
                           double g, double b, double alpha, double r_index,
                           double shiny)
@@ -373,6 +372,19 @@ struct object3D *newCone(double ra, double rd, double rs, double rg, double r,
   }
   return (cone);
 }
+
+
+struct areaLS *newALS(struct object3D *obj,int sample){
+  // construct new als using the shape of obj and the color of obj as light rgb 
+  
+  struct areaLS *aLS =
+      (struct areaLS *)calloc(1, sizeof(struct areaLS));
+  aLS->light_shape = obj;
+  aLS->k_sample = sample;
+  obj->isLightSource = 1;
+  return aLS;
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////
 // TO DO:
 //	Complete the functions that compute intersections for the canonical
@@ -395,18 +407,29 @@ void planeIntersect(struct object3D *plane, struct ray3D *ray, double *lambda,
   //    Lambda = ((p1 - a) . n) / (d . n)
 
   struct ray3D ray_transformed;
+  struct point3D normal,p1a;
   rayTransform(ray, &ray_transformed, plane);
+  normal.px = 0;
+  normal.py = 0;
+  normal.pz = 1;
+  normal.pw = 1;
+  p1a.px = 0;
+  p1a.py = 0;
+  p1a.pz = 0;
+  p1a.pw = 1;
+  
 
-  struct point3D *normal = newPoint(0, 0, 1);
+
+
 
   // Ensure ray is not parallel z-axis
-  if (dot(&ray_transformed.d, normal) <= 0)
+  if (dot(&ray_transformed.d, &normal) <= 0)
     return;
 
   // Calculate current lambda
-  struct point3D *p1a = newPoint(0, 0, 0);
-  subVectors(&ray_transformed.p0, p1a);
-  double curr_lambda = dot(p1a, normal) / dot(&ray_transformed.d, normal);
+
+  subVectors(&ray_transformed.p0, &p1a);
+  double curr_lambda = dot(&p1a, &normal) / dot(&ray_transformed.d, &normal);
 
   // Ensure current lambda implies intersection
   if (curr_lambda == 0)
@@ -421,7 +444,7 @@ void planeIntersect(struct object3D *plane, struct ray3D *ray, double *lambda,
     *a = (p->px + 1) / 2;
     *b = (p->py + 1) / 2;
 
-    normalTransform(normal, n, plane);
+    normalTransform(&normal, n, plane);
     normalize(n);
 
     ray->rayPos(ray, *lambda, p);
@@ -599,10 +622,12 @@ void cylIntersect(struct object3D *cylinder, struct ray3D *ray, double *lambda,
     normalTransform(&orig_n, n, cylinder);
     normalize(n);
 
-    *a = atan(p->px / p->py);
-    *b = p->pz;
+    
 
     ray->rayPos(ray, *lambda, p);
+
+    *a = atan(p->px / p->py);
+    *b = p->pz;
   }
 
 }
@@ -698,10 +723,12 @@ void coneIntersect(struct object3D *cone, struct ray3D *ray, double *lambda,
     normalTransform(&orig_n, n, cone);
     normalize(n);
 
+    
+    ray->rayPos(ray, *lambda, p);
+
     *a = atan(p->px / p->py);
     *b = p->pz;
 
-    ray->rayPos(ray, *lambda, p);
   }
 
 }
@@ -761,6 +788,24 @@ void planeSample(struct object3D *plane, double *x, double *y, double *z)
   // Returns the 3D coordinates (x,y,z) of a randomly sampled point on the plane
   // Sampling should be uniform, meaning there should be an equal change of
   // getting any spot on the plane
+  
+  double x_temp = get_random_double(-1.0,1.0);
+  double y_temp = get_random_double(-1.0,1.0);
+  double z_temp = 0;
+
+
+  struct point3D transformed_p;
+  transformed_p.px = x_temp;
+  transformed_p.py = y_temp;
+  transformed_p.pz = z_temp;
+  transformed_p.pw = 1;
+  
+  matVecMult(plane->T,&transformed_p);
+
+  *x = transformed_p.px;
+  *y = transformed_p.py;
+  *z = transformed_p.pz;
+
 
   /////////////////////////////////
   // TO DO: Complete this function.
@@ -774,15 +819,41 @@ void sphereSample(struct object3D *sphere, double *x, double *y, double *z)
   // do some research and document in your report what method is used to do
   // this, along with a reference to your source.
 
-  /////////////////////////////////
-  // TO DO: Complete this function.
-  /////////////////////////////////
+  double theta = get_random_double(0,2*PI);
+  double rho = get_random_double(-PI/2,PI/2);
+
+  struct point3D tmp_p;
+  tmp_p.px = sin(rho) * cos(theta);
+  tmp_p.py = sin(rho) * sin(theta);
+  tmp_p.pz = cos(rho);
+  tmp_p.pw = 1;
+
+  matVecMult(sphere->T,&tmp_p);
+
+  *x = tmp_p.px;
+  *y = tmp_p.py;
+  *z = tmp_p.pz;
 }
 
 void cylSample(struct object3D *cyl, double *x, double *y, double *z)
 {
   // Returns the 3D coordinates (x,y,z) of a randomly sampled point on the
   // cylinder Sampling should be uniform over the cylinder.
+  double theta = get_random_double(0,2*PI);
+  double tmp_z = get_random_double(0,1);
+
+  struct point3D tmp_p;
+  tmp_p.px = sin(theta);
+  tmp_p.py = cos(theta);
+  tmp_p.pz = tmp_z;
+  tmp_p.pw = 1;
+
+  matVecMult(cyl->T,&tmp_p);
+
+
+  *x = tmp_p.px;
+  *y = tmp_p.py;
+  *z = tmp_p.pz;
 
   /////////////////////////////////
   // TO DO: Complete this function.
@@ -924,6 +995,7 @@ void insertPLS(struct pointLS *l, struct pointLS **list)
 {
   if (l == NULL)
     return;
+    
   // Inserts a light source into the list of light sources
   if (*(list) == NULL)
   {
@@ -934,6 +1006,25 @@ void insertPLS(struct pointLS *l, struct pointLS **list)
   {
     l->next = (*(list))->next;
     (*(list))->next = l;
+  }
+}
+
+void insertALS(struct areaLS *als, struct areaLS **list, struct object3D **obj_list){
+  if (als == NULL||als->light_shape == NULL)
+    return;
+
+  insertObject(als->light_shape,obj_list);
+
+  // Inserts a light source into the list of light sources
+  if (*(list) == NULL)
+  {
+    *(list) = als;
+    (*(list))->next = NULL;
+  }
+  else
+  {
+    als->next = (*(list))->next;
+    (*(list))->next = als;
   }
 }
 
@@ -1187,7 +1278,9 @@ void RotateToVec(struct object3D *o, struct point3D *s,struct point3D *d){
   // R = R + Vx2
   matAdd(Vx2,R);
   matMult(R, o->T);
-  
+
+
+  free(v);
 }
 
 void TranslateMat(double T[4][4], double tx, double ty, double tz)
@@ -1639,7 +1732,7 @@ void deleteImage(struct image *im)
 }
 
 void cleanup(struct object3D *o_list, struct pointLS *l_list,
-             struct textureNode *t_list)
+             struct textureNode *t_list,struct areaLS *als_list)
 {
   // De-allocates memory reserved for the object list and the point light source
   // list. Note that *YOU* must de-allocate any memory reserved for images
@@ -1647,6 +1740,7 @@ void cleanup(struct object3D *o_list, struct pointLS *l_list,
   struct object3D *p, *q;
   struct pointLS *r, *s;
   struct textureNode *t, *u;
+  struct areaLS *als_r,*als_s;
 
   p = o_list; // De-allocate all memory from objects in the list
   while (p != NULL)
@@ -1671,6 +1765,16 @@ void cleanup(struct object3D *o_list, struct pointLS *l_list,
     r = s;
   }
 
+  als_r = als_list; // Delete area light source list
+  while (r != NULL)
+  {
+    als_s = als_r->next;
+    free(als_r->light_shape);
+    free(als_r);
+    als_r = als_s;
+  }
+
+
   t = t_list; // Delete texture Images
   while (t != NULL)
   {
@@ -1681,6 +1785,7 @@ void cleanup(struct object3D *o_list, struct pointLS *l_list,
     free(t);
     t = u;
   }
+
 }
 
 

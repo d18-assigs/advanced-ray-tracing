@@ -162,11 +162,12 @@ struct object3D {
   int normalMapped;  // This object has an associated normal map
   int alphaMapped;   // This object has an associated alpha map
 
-  struct object3D *CSGnext;  // For CSG objects, points to next component
-  struct object3D *next;     // Pointer to next entry in object linked list
-
-  // If needed for the advanced raytracer, you can modify this data structure to
-  // add any data/methods you require.
+	struct object3D *CSGnext;	// For CSG objects, points to next component
+	struct object3D *next;		// Pointer to next entry in object linked list
+	
+	
+	// If needed for the advanced raytracer, you can modify this data structure to add any data/methods you
+	// require.
 };
 
 /* The structure below defines a point light source */
@@ -174,6 +175,18 @@ struct pointLS {
   struct colourRGB col;  // Light source colour
   struct point3D p0;     // Light source location
   struct pointLS *next;  // Pointer to next light in the scene
+};
+
+struct areaLS{
+	struct object3D *light_shape;
+	int k_sample;
+	struct areaLS *next;
+};
+
+struct areaLS{
+	struct object3D *light_shape;
+	int k_sample;
+	struct areaLS *next;
 };
 
 /*
@@ -207,5 +220,43 @@ void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os,
 void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
              struct ray3D *ray, int depth, double a, double b,
              struct colourRGB *col);
+
+// MultiThreading
+
+// render func render arguments
+struct renderThreadArg{
+  int thread_num;	
+  struct view *cam;  // Camera and view for this scene
+  int sx;            // Size of the raytraced image
+  int start_y;		 // Start of responsable ys
+  int end_y;	     // End of responsbale ys
+  int antialiasing;  // Flag to determine whether antialiaing is enabled or
+                     // disabled
+  double du, dv;  // Increase along u and v directions for pixel coordinates
+  struct colourRGB *background;  // Background colour
+  unsigned char *rgbIm;
+};
+
+// render thread func
+void * renderThreadFunc(void *vargp);
+
+// MultiThreading
+
+// render func render arguments
+struct renderThreadArg{
+  int thread_num;	
+  struct view *cam;  // Camera and view for this scene
+  int sx;            // Size of the raytraced image
+  int start_y;		 // Start of responsable ys
+  int end_y;	     // End of responsbale ys
+  int antialiasing;  // Flag to determine whether antialiaing is enabled or
+                     // disabled
+  double du, dv;  // Increase along u and v directions for pixel coordinates
+  struct colourRGB *background;  // Background colour
+  unsigned char *rgbIm;
+};
+
+// render thread func
+void * renderThreadFunc(void *vargp);
 
 #endif

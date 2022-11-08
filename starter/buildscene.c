@@ -26,6 +26,7 @@
  struct object3D *o;
  struct pointLS *l;
  struct point3D p;
+ struct areaLS *aLS;
 
  // Simple scene for Assignment 3:
  // Insert a couple of objects. A plane and two spheres
@@ -56,29 +57,123 @@
 						//     nothing happens! your object won't be rendered.
 
  // That's it for defining a single sphere... let's add a couple more objects
- o=newSphere(.05,.95,.95,.75,.75,.95,.55,1,1,6);
+//  0, 46, 148
+ o=newSphere(.05,.95,.95,.75,0,.18,.58,1,1,6);
  Scale(o,.95,1.65,.65);
  RotateZ(o,-PI/1.5);
  Translate(o,-2.2,1.75,1.35);
  invert(&o->T[0][0],&o->Tinv[0][0]);
  insertObject(o,&object_list);
 
- o=newPlane(.05,.75,.05,.05,.55,.8,.75,1,1,2);
- Scale(o,11,11,11);
- RotateZ(o,PI/4);
- RotateX(o,PI/2);
- Translate(o,0,-4,5);
+
+ o=newSphere(.05,.95,.95,.75,0,.18,.58,1,1,6);
+ Translate(o,0,0,2);
  invert(&o->T[0][0],&o->Tinv[0][0]);
  insertObject(o,&object_list);
 
+ o=newPlane(.05,.75,.05,.15,0.5,.29,.61,1,1,2);
+ Scale(o,8,8,8);
+ Translate(o,0,0,8);
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ insertObject(o,&object_list);
+
+
+  o=newPlane(.05,.75,.05,.15,0.5,.29,.61,1,1,2);
+ Scale(o,8,8,8);
+ RotateX(o,-PI/2);
+ Translate(o,0,8,0);
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ insertObject(o,&object_list);
+
+
+  o=newPlane(.05,.75,.05,.15,0.5,.29,.61,1,1,2);
+ Scale(o,8,8,8);
+ RotateX(o,PI/2);
+ Translate(o,0,-8,0);
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ insertObject(o,&object_list);
+
+  o=newPlane(.05,.75,.05,.15,0.5,.29,.61,1,1,2);
+ Scale(o,8,8,8);
+ RotateY(o,-PI/2);
+ Translate(o,-8,0,0);
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ insertObject(o,&object_list);
+
+  o=newPlane(.05,.75,.05,.15,0.5,.29,.61,1,1,2);
+ Scale(o,8,8,8);
+ RotateY(o,PI/2);
+ Translate(o,8,0,0);
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ insertObject(o,&object_list);
+
+
+
+//   o=newPlane(.05,.75,.05,.45,.55,.8,.75,1,1,2);
+//  Scale(o,11,11,11);
+//  RotateZ(o,PI/4);
+//  RotateX(o,PI/2);
+//  Translate(o,0,-4,5);
+//  invert(&o->T[0][0],&o->Tinv[0][0]);
+//  insertObject(o,&object_list);
+
  // Insert a single point light source. We set up its position as a point structure, and specify its
  // colour in terms of RGB (in [0,1]).
- p.px=0;
- p.py=25.5;
- p.pz=-3.5;
- p.pw=1;
- l=newPLS(&p,.95,.95,.95);
- insertPLS(l,&light_list);
+//  p.px=0;
+//  p.py=6;
+//  p.pz=0;
+//  p.pw=1;
+//  l=newPLS(&p,1,1,1);
+//  insertPLS(l,&light_list);
+
+
+ o=newSphere(.05,.75,.05,.05,1,1,1,1,1,2);
+ Scale(o,.8,.8,.8);
+ Translate(o,0,6,-5);
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ aLS = newALS(o,500);
+ insertALS(aLS,&aLS_list,&object_list);
+
+//   o = newCyl(.05,.75,.05,.05,1,1,1,1,1,2);
+//   Translate(o,0,0,-.5);
+//   Scale(o,.3,.3,3);
+//   RotateX(o,-PI/3);
+//   Translate(o,0,1,2);
+//   invert(&o->T[0][0],&o->Tinv[0][0]);
+//   aLS = newALS(o,1000);
+//   insertALS(aLS,&aLS_list,&object_list);
+
+
+  // o = newCyl(.05,.75,.05,.05,1,1,1,1,1,2);
+  // Translate(o,0,0,-.5);
+  // Scale(o,.1,.1,5);
+  // // RotateY(o,-PI/6);
+  // RotateX(o,PI/2);
+  // Translate(o,5.5,0,3);
+  // invert(&o->T[0][0],&o->Tinv[0][0]);
+  // aLS = newALS(o,100);
+  // insertALS(aLS,&aLS_list,&object_list);
+
+
+  // o = newCyl(.05,.75,.05,.05,1,1,1,1,1,2);
+  // Translate(o,0,0,-.5);
+  // Scale(o,.1,.1,2);
+  // RotateY(o,-PI/6);
+  // // RotateX(o,PI/2);
+  // Translate(o,0,2,2);
+  // invert(&o->T[0][0],&o->Tinv[0][0]);
+  // aLS = newALS(o,500);
+  // insertALS(aLS,&aLS_list,&object_list);
+  
+  
+  
+//   o=newPlane(.05,.75,.05,.05,1,1,1,1,1,2);
+//   RotateX(o,-PI/2);
+//   Scale(o,2,2,2);
+//   Translate(o,0,5,.6);
+//   invert(&o->T[0][0],&o->Tinv[0][0]);
+//   aLS = newALS(o,1000);
+//   insertALS(aLS,&aLS_list,&object_list);
 
  // End of simple scene for Assignment 2
  // Keep in mind that you can define new types of objects such as cylinders and parametric surfaces,

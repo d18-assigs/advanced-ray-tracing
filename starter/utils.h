@@ -110,6 +110,13 @@ void Translate(struct object3D *o, double tx, double ty, double tz);	// 3D trans
 void Scale(struct object3D *o, double sx, double sy, double sz);	// 3D non-uniform scaling
 void printmatrix(double mat[4][4]);
 
+// get random doubles 
+inline double get_random_double(double start,double end){
+  double range = (end - start); 
+    double div = RAND_MAX / range;
+    return start + (rand() / div);
+}
+
 // Vector management
 inline void normalize(struct point3D *v)
 {
@@ -217,6 +224,7 @@ struct object3D *newPlane(double ra, double rd, double rs, double rg, double r, 
 struct object3D *newSphere(double ra, double rd, double rs, double rg, double r, double g, double b, double alpha, double R_index, double shiny);
 struct object3D *newCyl(double ra, double rd, double rs, double rg, double r, double g, double b, double alpha, double R_index, double shiny);
 struct object3D *newCone(double ra, double rd, double rs, double rg, double r, double g, double b, double alpha, double R_index, double shiny);
+struct areaLS *newALS(struct object3D *obj,int sample);
 
 // Functions to obtain surface coordinates on objects
 void planeCoordinates(struct object3D *plane, double a, double b, double *x, double *y, double *z);
@@ -245,6 +253,7 @@ void alphaMap(struct image *img, double a, double b, double *R, double *G, doubl
 // Functions to insert objects and lights into their respective lists
 void insertObject(struct object3D *o, struct object3D **list);
 void insertPLS(struct pointLS *l, struct pointLS **list);
+void insertALS(struct areaLS *o, struct areaLS **list, struct object3D **obj_list);
 void addAreaLight(double sx, double sy, double nx, double ny, double nz,\
                   double tx, double ty, double tz, int lx, int ly,\
                   double r, double g, double b, struct object3D **o_list, struct pointLS **l_list);
@@ -265,7 +274,7 @@ void deleteImage(struct image *im);
 // need to do your own clean-up wherever you have requested ray positions,
 // since each call to the ray position function returns a newly allocated point3D
 // structure.
-void cleanup(struct object3D *o_list, struct pointLS *l_list, struct textureNode *t_list);
+void cleanup(struct object3D *o_list, struct pointLS *l_list, struct textureNode *t_list,struct areaLS *als_list);
 
 
 // hierachycal generation function

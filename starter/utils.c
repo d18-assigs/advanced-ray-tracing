@@ -971,8 +971,8 @@ void texMap(struct image *img, double a, double b, double *R, double *G,
 
   // Current pixel (s, t) in texture coordinates (however, it could be in
   // between actual image pixels)
-  double s = a * img->sx;
-  double t = b * img->sy;
+  double s = a * img->sx - 1;
+  double t = b * img->sy - 1;
 
   // Find surrounding pixels that make up a rectangle around (s, t)
   int s0 = (int)floor(s);
@@ -982,8 +982,8 @@ void texMap(struct image *img, double a, double b, double *R, double *G,
 
   // Precalculation to avoid rerunning this code below. The essence is to end up
   // with the correct pixel in the texture image by adding tx_img to sx
-  int t0_img = t0 * img->sx;
-  int t1_img = t1 * img->sx;
+  int t0_img = t0 * img->sx - 1;
+  int t1_img = t1 * img->sx - 1;
 
   // Ratios in s and t directions
   double rs = ((double)(s - s0)) / ((double)(s1 - s0));

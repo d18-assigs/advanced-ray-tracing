@@ -940,8 +940,7 @@ void loadTexture(struct object3D *o, const char *filename, int type,
 }
 
 void texMap(struct image *img, double a, double b, double *R, double *G,
-            double *B)
-{
+            double *B) {
   /*
    Function to determine the colour of a textured object at
    the normalized texture coordinates (a,b).
@@ -955,7 +954,7 @@ void texMap(struct image *img, double a, double b, double *R, double *G,
   */
 
   //////////////////////////////////////////////////
-  // TO DO (Assignment 4 only):
+  // TO DO (Assignment 4 only) (DONE):
   //
   //  Complete this function to return the colour
   // of the texture image at the specified texture
@@ -963,10 +962,53 @@ void texMap(struct image *img, double a, double b, double *R, double *G,
   // interpolation to obtain the texture colour.
   //////////////////////////////////////////////////
 
-  *(R) = 0; // Returns black - delete this and
-  *(G) = 0; // replace with your code to compute
-  *(B) = 0; // texture colour at (a,b)
-  return;
+  // Bilinear Interpolation reference:
+  // https://cseweb.ucsd.edu/classes/wi18/cse167-a/lec9.pdf Slide 11 All
+  // variables defined below are corresponding to the reference above
+
+  // Texture image
+  double *img_rgb = (double *)img->rgbdata;
+
+  // Current pixel (s, t) in texture coordinates (however, it could be in
+  // between actual image pixels)
+  double s = a * img->sx;
+  double t = b * img->sy;
+
+  // Find surrounding pixels that make up a rectangle around (s, t)
+  int s0 = (int)floor(s);
+  int s1 = (int)ceil(s);
+  int t0 = (int)floor(t);
+  int t1 = (int)ceil(t);
+
+  // Precalculation to avoid rerunning this code below. The essence is to end up
+  // with the correct pixel in the texture image by adding tx_img to sx
+  int t0_img = t0 * img->sx;
+  int t1_img = t1 * img->sx;
+
+  // Ratios in s and t directions
+  double rs = ((double)(s - s0)) / ((double)(s1 - s0));
+  double rt = ((double)(t - t0)) / ((double)(t1 - t0));
+
+  // Calculate top and bottom ratio for all colours
+  double ctop_r = *(img_rgb + (t1_img + s0) * 3) * (1.0 - rs) +
+                  *(img_rgb + (t1_img + s1) * 3) * rs;
+  double cbot_r = *(img_rgb + (t0_img + s0) * 3) * (1.0 - rs) +
+                  *(img_rgb + (t0_img + s1) * 3) * rs;
+
+  double ctop_g = *(img_rgb + (t1_img + s0) * 3 + 1) * (1.0 - rs) +
+                  *(img_rgb + (t1_img + s1) * 3 + 1) * rs;
+  double cbot_g = *(img_rgb + (t0_img + s0) * 3 + 1) * (1.0 - rs) +
+                  *(img_rgb + (t0_img + s1) * 3 + 1) * rs;
+
+  double ctop_b = *(img_rgb + (t1_img + s0) * 3 + 2) * (1.0 - rs) +
+                  *(img_rgb + (t1_img + s1) * 3 + 2) * rs;
+  double cbot_b = *(img_rgb + (t0_img + s0) * 3 + 2) * (1.0 - rs) +
+                  *(img_rgb + (t0_img + s1) * 3 + 2) * rs;
+
+  // Get pixel colour based on ratios of surrounding pixels
+  *R = cbot_r * (1.0 - rt) + ctop_r * rt;
+  *G = cbot_g * (1.0 - rt) + ctop_g * rt;
+  *B = cbot_b * (1.0 - rt) + ctop_b * rt;
 }
 
 void alphaMap(struct image *img, double a, double b, double *alpha)

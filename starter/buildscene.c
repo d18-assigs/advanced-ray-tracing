@@ -41,7 +41,7 @@
  invert(&o->T[0][0],&o->Tinv[0][0]);			// Compute the inverse transform * DON'T FORGET TO DO THIS! *
 
  // If needed, this is how you load a texture map
- // loadTexture(o,"./Texture/mosaic2.ppm",1,&texture_list);	// This loads a texture called 'mosaic2.ppm'. The
+ loadTexture(o,"./Texture/wood.ppm",1,&texture_list);	// This loads a texture called 'mosaic2.ppm'. The
 								// texture gets added to the texture list, and a
 								// pointer to it is stored within this object in the
 								// corresponding place. The '1' indicates this image

@@ -218,6 +218,7 @@ struct object3D *newPlane(double ra, double rd, double rs, double rg, double r,
     memcpy(&plane->T[0][0], &eye4x4[0][0], 16 * sizeof(double));
     memcpy(&plane->Tinv[0][0], &eye4x4[0][0], 16 * sizeof(double));
     plane->textureMap = &texMap;
+    plane->alphaMap = &alphaMap;
     plane->frontAndBack = 1;
     plane->photonMapped = 0;
     plane->normalMapped = 0;
@@ -269,6 +270,7 @@ struct object3D *newSphere(double ra, double rd, double rs, double rg, double r,
     memcpy(&sphere->T[0][0], &eye4x4[0][0], 16 * sizeof(double));
     memcpy(&sphere->Tinv[0][0], &eye4x4[0][0], 16 * sizeof(double));
     sphere->textureMap = &texMap;
+    sphere->alphaMap = &alphaMap;
     sphere->frontAndBack = 0;
     sphere->photonMapped = 0;
     sphere->normalMapped = 0;
@@ -315,6 +317,7 @@ struct object3D *newCyl(double ra, double rd, double rs, double rg, double r,
     memcpy(&cylinder->T[0][0], &eye4x4[0][0], 16 * sizeof(double));
     memcpy(&cylinder->Tinv[0][0], &eye4x4[0][0], 16 * sizeof(double));
     cylinder->textureMap = &texMap;
+    cylinder->alphaMap = &alphaMap;
     cylinder->frontAndBack = 0;
     cylinder->photonMapped = 0;
     cylinder->normalMapped = 0;
@@ -362,6 +365,7 @@ struct object3D *newCone(double ra, double rd, double rs, double rg, double r,
     memcpy(&cone->T[0][0], &eye4x4[0][0], 16 * sizeof(double));
     memcpy(&cone->Tinv[0][0], &eye4x4[0][0], 16 * sizeof(double));
     cone->textureMap = &texMap;
+    cone->alphaMap = &alphaMap;
     cone->frontAndBack = 0;
     cone->photonMapped = 0;
     cone->normalMapped = 0;
@@ -899,7 +903,7 @@ void loadTexture(struct object3D *o, const char *filename, int type,
         else if (type == 2)
           o->normalMap = p->im;
         else
-          o->alphaMap = p->im;
+          o->alphaImg = p->im;
         return;
       }
       p = p->next;
@@ -928,12 +932,15 @@ void loadTexture(struct object3D *o, const char *filename, int type,
         (*(t_list))->next = p;
       }
       // Assign to object
-      if (type == 1)
+      if (type == 1) 
         o->texImg = im;
-      else if (type == 2)
+      else if (type == 2) {
         o->normalMap = im;
-      else
-        o->alphaMap = im;
+        o->normalMapped = 1;
+      } else {
+        o->alphaImg = im;
+        o->alphaMapped = 1;
+      }
     }
 
   } // end if (o != NULL)
@@ -1026,8 +1033,41 @@ void alphaMap(struct image *img, double a, double b, double *alpha)
   // interpolation to obtain the texture colour.
   //////////////////////////////////////////////////
 
-  *(alpha) = 1; // Returns 1 which means fully opaque. Replace
-  return;       // with your code if implementing alpha maps.
+  // Bilinear Interpolation reference:
+  // https://cseweb.ucsd.edu/classes/wi18/cse167-a/lec9.pdf Slide 11 All
+  // variables defined below are corresponding to the reference above
+
+  // Texture image
+  double *img_rgb = (double *)img->rgbdata;
+
+  // Current pixel (s, t) in texture coordinates (however, it could be in
+  // between actual image pixels)
+  double s = a * img->sx - 1;
+  double t = b * img->sy - 1;
+
+  // Find surrounding pixels that make up a rectangle around (s, t)
+  int s0 = (int)floor(s);
+  int s1 = (int)ceil(s);
+  int t0 = (int)floor(t);
+  int t1 = (int)ceil(t);
+
+  // Precalculation to avoid rerunning this code below. The essence is to end up
+  // with the correct pixel in the texture image by adding tx_img to sx
+  int t0_img = t0 * img->sx - 1;
+  int t1_img = t1 * img->sx - 1;
+
+  // Ratios in s and t directions
+  double rs = ((double)(s - s0)) / ((double)(s1 - s0));
+  double rt = ((double)(t - t0)) / ((double)(t1 - t0));
+
+  // Calculate top and bottom ratio for all colours
+  double ctop = *(img_rgb + (t1_img + s0)) * (1.0 - rs) +
+                  *(img_rgb + (t1_img + s1)) * rs;
+  double cbot = *(img_rgb + (t0_img + s0)) * (1.0 - rs) +
+                  *(img_rgb + (t0_img + s1)) * rs;
+
+  // Get alpha value based on ratios of surrounding values
+  *alpha = cbot * (1.0 - rt) + ctop * rt;
 }
 
 /////////////////////////////

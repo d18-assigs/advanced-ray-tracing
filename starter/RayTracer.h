@@ -133,6 +133,9 @@ struct object3D {
   void (*textureMap)(struct image *img, double a, double b, double *R,
                      double *G, double *B);
 
+  // Alpha mapping similar as above but with opacity
+  void (*alphaMap)(struct image *img, double a, double b, double *alpha);
+
   // Functions to return coordinates on the surface of the object. One takes as
   // input the a and b parameters for the parametric function of the object and
   // returns the (x,y,z) coordinates on the object surface. The second returns a
@@ -146,7 +149,7 @@ struct object3D {
       *texImg;  // Pointer to structure holding the texture for this object
   struct image *photonMap;  // Photon map for this object
   struct image *normalMap;  // Normal map for this object
-  struct image *alphaMap;   // Alpha map for the object
+  struct image *alphaImg;   // Alpha map for the object
 
   // Material properties
   double alpha;    // Opacity - if less than 1 this is a semi transparent object

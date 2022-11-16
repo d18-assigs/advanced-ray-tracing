@@ -108,6 +108,16 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
     obj->textureMap(obj->texImg, a, b, &R, &G, &B);
   }
 
+  // Apply normal mapping
+  if (obj->normalMapped) {
+    obj->textureMap(obj->normalMap, a, b, &n->px, &n->py, &n->pz);
+  }
+
+  // Apply alpha mapping
+  if (obj->alphaMapped) {
+    obj->alphaMap(obj->alphaImg, a, b, &obj->alpha);
+  }
+
   //////////////////////////////////////////////////////////////
   // TO DO: Implement this function. Refer to the notes for
   // details about the shading model. (DONE)

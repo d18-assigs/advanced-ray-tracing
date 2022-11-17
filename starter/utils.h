@@ -318,5 +318,5 @@ void cleanup(struct object3D *o_list, struct pointLS *l_list, struct textureNode
 
 
 // hierachycal generation function
-void hierachycal_shpere(struct object3D *prev_o, int depth, double r, struct object3D **list);
+void hierachycal_shpere(struct object3D *prev_o, int depth, double r, struct object3D **list, struct textureNode **textureList);
 #endif

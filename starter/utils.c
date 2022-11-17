@@ -1966,7 +1966,7 @@ void cleanup(struct object3D *o_list, struct pointLS *l_list,
     }
 }
 
-void hierachycal_shpere(struct object3D *prev_o, int depth, double r, struct object3D **list) {
+void hierachycal_shpere(struct object3D *prev_o, int depth, double r, struct object3D **list, struct textureNode **textureList) {
     // a hierarchical sphere generation script that generate child shperes around the parent spheres
 
     if (depth <= 0) {
@@ -2006,9 +2006,11 @@ void hierachycal_shpere(struct object3D *prev_o, int depth, double r, struct obj
             Translate(cur_object, p.px, p.py, p.pz);
             matMult(prev_o->T, cur_object->T);
             invert(&cur_object->T[0][0], &cur_object->Tinv[0][0]);
+            loadTexture(cur_object,"./Texture/n_wood.ppm",2,textureList);
+            loadTexture(cur_object,"./Texture/t_wood.ppm",1,textureList);
             insertObject(cur_object, list);
             // recursive call
-            hierachycal_shpere(cur_object, depth - 1, r, list);
+            hierachycal_shpere(cur_object, depth - 1, r, list, textureList);
         }
     }
 }

@@ -71,11 +71,11 @@ struct areaLS *aLS;
   switch (scene)
   {
   case 0:
-    #include "buildscene.c" 
+    #include "ALScylinder.c" 
     break;
   case 1:
-    #include "testScene3.c"
-    break;
+  #include "ALSplane.c" 
+  break;
   case 2:
     #include "testScene.c"
     break;
@@ -553,17 +553,11 @@ int findFirstHitOctTree(struct octTreeNode* parent,struct ray3D *ray, double *la
     assignPoint(&p_max,max(p_min.px,p_max.px),max(p_min.py,p_max.py),max(p_min.pz,p_max.pz));
 
       
-    
-    if (curr_node->cube == Os) {
-      curr_node= curr_node->next;
-      continue;
-    }
 
     // Get ray intersection with current box
     curr_node->cube->intersect(curr_node->cube, ray, &curr_lambda, &curr_p, &curr_n, &curr_a,
                         &curr_b);
     
-    ray_inside_box = ray->p0.px > p_min.px && ray->p0.px < p_max.px && ray->p0.py > p_min.py && ray->p0.py < p_max.py && ray->p0.pz > p_min.pz && ray->p0.pz < p_max.pz; 
     // test all the boxes I pass through
     if(curr_lambda > 0.0 ){
       if(curr_node->child == NULL){
@@ -573,11 +567,7 @@ int findFirstHitOctTree(struct octTreeNode* parent,struct ray3D *ray, double *la
         findFirstHitOctTree(curr_node->child,ray,lambda,Os,obj,p,n,a,b,depth-1);
       }
     }
-    if ( ray_inside_box)
-    {
-      findFirstHitOctTree(curr_node->child,ray,lambda,Os,obj,p,n,a,b,depth-1);
-    }
-    
+
 
     curr_node = curr_node->next;
 

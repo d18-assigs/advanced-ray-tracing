@@ -41,6 +41,8 @@ double eye4x4[4][4] = {{1.0, 0.0, 0.0, 0.0},
                        {0.0, 0.0, 1.0, 0.0},
                        {0.0, 0.0, 0.0, 1.0}};
 
+
+
 /////////////////////////////////////////////
 // Primitive data structure section
 /////////////////////////////////////////////
@@ -230,6 +232,25 @@ struct object3D *newPlane(double ra, double rd, double rs, double rg, double r,
   return (plane);
 }
 
+
+
+void getPMinPmax(struct object3D *obj,struct point3D *p_min,struct point3D *p_max){
+    struct point3D tmp_min,tmp_max;
+    assignPoint(&tmp_max,-__DBL_MAX__,-__DBL_MAX__,-__DBL_MAX__);
+    assignPoint(&tmp_min,__DBL_MAX__,__DBL_MAX__,__DBL_MAX__);
+    for (size_t i = 0; i < NUM_SAMPLE_OCT_TREE; i++)
+    {
+      double x,y,z;
+      obj->randomPoint(obj,&x,&y,&z);
+      assignPoint(&tmp_min,min(tmp_min.px,x),min(tmp_min.py,y),min(tmp_min.pz,z));
+      assignPoint(&tmp_max,max(tmp_max.px,x),max(tmp_max.py,y),max(tmp_max.pz,z));
+    }
+
+    copyPoint(&tmp_min,p_min);
+    copyPoint(&tmp_max,p_max);
+    
+}
+
 struct object3D *newSphere(double ra, double rd, double rs, double rg, double r,
                            double g, double b, double alpha, double r_index,
                            double shiny)
@@ -283,7 +304,7 @@ struct object3D *newSphere(double ra, double rd, double rs, double rg, double r,
 }
 
 struct object3D *newCyl(double ra, double rd, double rs, double rg, double r,
-                        double g, double b, double alpha, double R_index,
+                        double g, double b, double alpha, double r_index,
                         double shiny)
 {
   ///////////////////////////////////////////////////////////////////////////////////////
@@ -306,7 +327,7 @@ struct object3D *newCyl(double ra, double rd, double rs, double rg, double r,
     cylinder->col.G = g;
     cylinder->col.B = b;
     cylinder->alpha = alpha;
-    cylinder->r_index = R_index;
+    cylinder->r_index = r_index;
     cylinder->shinyness = shiny;
     cylinder->intersect = &cylIntersect;
     cylinder->surfaceCoords = &cylCoordinates;
@@ -330,7 +351,7 @@ struct object3D *newCyl(double ra, double rd, double rs, double rg, double r,
 }
 
 struct object3D *newCone(double ra, double rd, double rs, double rg, double r,
-                        double g, double b, double alpha, double R_index,
+                        double g, double b, double alpha, double r_index,
                         double shiny)
 {
   ///////////////////////////////////////////////////////////////////////////////////////
@@ -354,7 +375,7 @@ struct object3D *newCone(double ra, double rd, double rs, double rg, double r,
     cone->col.G = g;
     cone->col.B = b;
     cone->alpha = alpha;
-    cone->r_index = R_index;
+    cone->r_index = r_index;
     cone->shinyness = shiny;
     cone->intersect = &coneIntersect;
     cone->surfaceCoords = &coneCoordinates;
@@ -377,6 +398,114 @@ struct object3D *newCone(double ra, double rd, double rs, double rg, double r,
   return (cone);
 }
 
+struct object3D *newOctCube(struct point3D* p_min,struct point3D* p_max){
+
+  double dis_x,dis_y,dis_z;
+  dis_x = p_min->px;
+  dis_y = p_min->py;
+  dis_z = p_min->pz;
+
+
+  double scale;
+  scale = (p_max->px - p_min->px)/2;
+  scale = max((p_max->py - p_min->py)/2,scale);
+  scale = max((p_max->pz - p_min->pz)/2,scale);
+
+  printf("scaling by: %f\n and x y z %f %f %f\n",scale,dis_x,dis_y,dis_z);
+  
+  struct object3D* cube = newCube(.05,.95,.35,.35,.5,.5,.5,.5,.6,1);
+  Translate(cube,1,1,1);
+  Scale(cube,scale,scale,scale);
+  Translate(cube,dis_x,dis_y,dis_z);
+  invert(&cube->T[0][0],&cube->Tinv[0][0]);	
+  return cube;
+
+}
+struct object3D *newCube(double ra, double rd, double rs, double rg, double r, double g, double b, double alpha, double r_index, double shiny){
+  struct object3D *cube = (struct object3D *)calloc(1, sizeof(struct object3D));
+  if (!cube)
+    fprintf(stderr, "Unable to allocate new sphere, out of memory!\n");
+  else
+  {
+    cube->alb.ra = ra;
+    cube->alb.rd = rd;
+    cube->alb.rs = rs;
+    cube->alb.rg = rg;
+    cube->col.R = r;
+    cube->col.G = g;
+    cube->col.B = b;
+    cube->alpha = alpha;
+    cube->r_index = r_index;
+    cube->shinyness = shiny;
+    cube->intersect = &cubeIntersect;
+    cube->surfaceCoords = NULL;
+    // cube->randomPoint = &cubeSample;
+    cube->texImg = NULL;
+    cube->photonMap = NULL;
+    cube->normalMap = NULL;
+    memcpy(&cube->T[0][0], &eye4x4[0][0], 16 * sizeof(double));
+    memcpy(&cube->Tinv[0][0], &eye4x4[0][0], 16 * sizeof(double));
+    cube->textureMap = &texMap;
+    cube->frontAndBack = 0;
+    cube->photonMapped = 0;
+    cube->normalMapped = 0;
+    cube->isCSG = 0;
+    cube->isLightSource = 0;
+    cube->CSGnext = NULL;
+    cube->next = NULL;
+  }
+  return (cube);
+}
+
+
+struct object3D *duplicateObj(struct object3D* src_obj, int with_T){
+    // return newCube(src->alb.ra,src->alb.rd,src->alb.rs,src->alb.rg,src->col.R,src->col.G,src->col.B,src->alpha,src->r_index,src->shinyness);
+    struct object3D* newObject = (struct object3D*) calloc(1,sizeof(struct object3D));
+    if (!newObject)
+    fprintf(stderr, "Unable to allocate new sphere, out of memory!\n");
+  else
+  {
+    newObject->alb.ra = src_obj->alb.ra;
+    newObject->alb.rd = src_obj->alb.rd;
+    newObject->alb.rs = src_obj->alb.rs;
+    newObject->alb.rg = src_obj->alb.rg;
+    newObject->col.R = src_obj->col.R;
+    newObject->col.G = src_obj->col.G;
+    newObject->col.B = src_obj->col.B;
+    newObject->alpha = src_obj->alpha;
+    newObject->r_index = src_obj->r_index;
+    newObject->shinyness = src_obj->shinyness;
+    newObject->intersect = src_obj->intersect;
+    newObject->surfaceCoords = src_obj->surfaceCoords;
+    newObject->randomPoint = src_obj->randomPoint;
+    newObject->texImg = src_obj->texImg;
+    newObject->photonMap = src_obj->photonMap;
+    newObject->normalMap = src_obj->normalMap;
+
+    if (with_T)
+    {
+      
+    memcpy(&newObject->T[0][0], &src_obj->T[0][0], 16 * sizeof(double));
+    memcpy(&newObject->Tinv[0][0], &src_obj->Tinv[0][0], 16 * sizeof(double));
+    }else{
+      
+    memcpy(&newObject->T[0][0], &eye4x4[0][0], 16 * sizeof(double));
+    memcpy(&newObject->Tinv[0][0], &eye4x4[0][0], 16 * sizeof(double));
+    }
+    
+    newObject->textureMap = &texMap;
+    newObject->frontAndBack = src_obj->frontAndBack;
+    newObject->photonMapped = src_obj->photonMapped;
+    newObject->normalMapped = src_obj->normalMapped;
+    newObject->isCSG = src_obj->isCSG;
+    newObject->isLightSource = src_obj->isLightSource;
+    newObject->CSGnext = NULL;
+    newObject->next = NULL;
+  }
+  return (newObject);
+
+
+}
 
 struct areaLS *newALS(struct object3D *obj,int sample){
   // construct new als using the shape of obj and the color of obj as light rgb 
@@ -453,6 +582,58 @@ void planeIntersect(struct object3D *plane, struct ray3D *ray, double *lambda,
 
     ray->rayPos(ray, *lambda, p);
   }
+}
+
+inline void getCubeNormal(struct point3D *p,struct point3D *n){
+  double x = p->px;
+  double y = p->py;
+  double z = p->pz;
+
+  if (fabs(x)>fabs(y) && fabs(x) > fabs(z))
+  {
+    assignPoint(n,x,0,0);
+  }else if(fabs(y)>fabs(z) && fabs(y) > fabs(x)){
+      assignPoint(n,0,y,0);
+  }else{
+      assignPoint(n,0,0,z);
+  }
+  
+}
+void cubeIntersect(struct object3D *cube, struct ray3D *ray, double *lambda, struct point3D *p, struct point3D *n, double *a, double *b){
+
+// cubeIntersect reference is at 
+// https://gamedev.stackexchange.com/questions/18436/most-efficient-aabb-vs-ray-collision-algorithms
+
+struct ray3D ray_transformed;
+rayTransform(ray, &ray_transformed, cube);
+struct point3D dirfrac;
+assignPoint(&dirfrac,1.0/(ray_transformed.d.px),1.0/(ray_transformed.d.py),1.0/(ray_transformed.d.pz));
+double t1,t2,t3,t4,t5,t6,tmin,tmax;
+
+t1 = (-1 - ray_transformed.p0.px) * dirfrac.px;
+t2 = (1 - ray_transformed.p0.px) * dirfrac.px;
+t3 = (-1 - ray_transformed.p0.py) * dirfrac.py;
+t4 = (1 - ray_transformed.p0.py) * dirfrac.py;
+t5 = (-1 - ray_transformed.p0.pz) * dirfrac.pz;
+t6 = (1 - ray_transformed.p0.pz) * dirfrac.pz;
+
+
+tmin = max(max(min(t1, t2), min(t3, t4)), min(t5, t6));
+tmax = min(min(max(t1, t2), max(t3, t4)), max(t5, t6));
+
+if (tmax > 0 && tmin < tmax)
+{
+  *lambda = tmin;
+  struct point3D tmp_p,tmp_n;
+  rayPosition(&ray_transformed,*lambda,&tmp_p);
+
+  getCubeNormal(&tmp_p,&tmp_n);
+
+  normalTransform(&tmp_n,n,cube);
+
+  ray->rayPos(ray, *lambda, p);
+}
+
 }
 
 void sphereIntersect(struct object3D *sphere, struct ray3D *ray, double *lambda,
@@ -573,7 +754,7 @@ void cylIntersect(struct object3D *cylinder, struct ray3D *ray, double *lambda,
   // top
   lambda3 = (1 - ray_transformed.p0.pz) / ray_transformed.d.pz;
   // bottom
-  lambda4 = (-ray_transformed.p0.pz) / ray_transformed.d.pz;
+  lambda4 = (-1-ray_transformed.p0.pz) / ray_transformed.d.pz;
 
   // caclulate test intersection points
   rayPosition(&ray_transformed, lambda1, &test_p_1);
@@ -582,14 +763,14 @@ void cylIntersect(struct object3D *cylinder, struct ray3D *ray, double *lambda,
   rayPosition(&ray_transformed, lambda4, &test_p_4);
 
   // test side 0 <= z <= 1
-  if (test_p_1.pz >= 0 && test_p_1.pz <= 1 && lambda1 > 0 && lambda1 < min_lambda)
+  if (test_p_1.pz >= -1 && test_p_1.pz <= 1 && lambda1 > 0 && lambda1 < min_lambda)
   {
     min_lambda = lambda1;
     copyPoint(&test_p_1, &orig_n);
     orig_n.pz = 0;
     intersect_success = true;
   }
-  if (test_p_2.pz >= 0 && test_p_2.pz <= 1 && lambda2 > 0 && lambda2 < min_lambda)
+  if (test_p_2.pz >= -1 && test_p_2.pz <= 1 && lambda2 > 0 && lambda2 < min_lambda)
   {
     min_lambda = lambda2;
     copyPoint(&test_p_2, &orig_n);
@@ -824,7 +1005,7 @@ void sphereSample(struct object3D *sphere, double *x, double *y, double *z)
   // this, along with a reference to your source.
 
   double theta = get_random_double(0,2*PI);
-  double rho = get_random_double(-PI/2,PI/2);
+  double rho = get_random_double(0,2*PI);
 
   struct point3D tmp_p;
   tmp_p.px = sin(rho) * cos(theta);
@@ -1906,7 +2087,7 @@ void hierachycal_shpere(struct object3D *prev_o, int depth, double r, struct obj
 			p.py = (1 + r) * sin(phi) * sin(theta);
 			p.pz = (1 + r) * cos(phi);
       p.pw = 0;
-			cur_object = i == 0?newSphere(.05, .3, .3, .0, .75, 0, 0, 1, 1, 6) : newSphere(.05, .3, .3, .75, .75, .95, .55, 1, 1, 6);
+			cur_object = i == 0?newSphere(.05, .3, .3, .13, 0,.18,.58, .6, 1.5, 2) : newSphere(.05, .3, .3, .75, 0,.18,.58, .6, 1.5, 2);
       struct point3D up;
       up.px = 0;
       up.py = 0;

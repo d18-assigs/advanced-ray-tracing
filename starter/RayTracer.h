@@ -23,7 +23,7 @@
 
 #define PI 3.14159265354
 #define ANTIALIASING_SAMPLES \
-  4  // How many samples to perform on each axis, number must be above 1
+  2  // How many samples to perform on each axis, number must be above 1
 
 /* The structure below is used to hold a single RGB image. 'rgbdata' points */
 /* to an array of size sx*sy*[num layers] but note that your code must know */
@@ -68,6 +68,8 @@ struct ray3D {
 
   /* You may add data here to keep track of any values associated */
   /* with this ray when implementing advanced raytracing features */
+  double last_r_index; // r_index of the last traveled medium
+  int been_refracted_reflected;
 };
 
 /*
@@ -173,6 +175,15 @@ struct object3D {
 	// require.
 };
 
+
+struct octTreeNode {
+  // stores the min and max location of current cube
+  struct object3D *cube;
+  struct octTreeNode* child;
+  struct octTreeNode *next;
+  struct object3D *obj_list;
+};
+
 /* The structure below defines a point light source */
 struct pointLS {
   struct colourRGB col;  // Light source colour
@@ -213,11 +224,13 @@ void rayTrace(struct ray3D *ray, int depth, struct colourRGB *col,
               struct object3D *Os);  // RayTracing routine
 void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os,
                   struct object3D **obj, struct point3D *p, struct point3D *n,
-                  double *a, double *b);
+                  double *a, double *b, struct object3D *cur_object_list);
+int findFirstHitOctTree(struct octTreeNode* parent,struct ray3D *ray, double *lambda, struct object3D *Os,
+                  struct object3D **obj, struct point3D *p, struct point3D *n,
+                  double *a, double *b, int depth);
 void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
              struct ray3D *ray, int depth, double a, double b,
              struct colourRGB *col);
-
 // MultiThreading
 
 // render func render arguments
@@ -232,8 +245,7 @@ struct renderThreadArg{
   double du, dv;  // Increase along u and v directions for pixel coordinates
   struct colourRGB *background;  // Background colour
   unsigned char *rgbIm;
-
-
+  
   // antialiasing
   double antialiasing_step;
   double antialiasing_division;

@@ -42,19 +42,199 @@
 
 #include "utils.h"  // <-- This includes RayTracer.h
 
-#define min(A, B) ((A) < (B) ? (A) : (B))
+
 
 // A couple of global structures and data: An object list, a light list, and the
 // maximum recursion depth
+struct octTreeNode* oct_tree_root;
 struct object3D *object_list = NULL;
 struct pointLS *light_list = NULL;
 struct areaLS *aLS_list = NULL;
+struct octTreeNode *node_list = NULL;
 struct textureNode *texture_list;
 int MAX_DEPTH;
+int MAX_FORWARD_DEPTH = 2;
+int num_spaces = 0;
+#define OCT_TREE_DEPTH 4
+
+int scene = 0;
+
+
 
 void buildScene(void) {
-#include "buildscene.c"  // <-- Import the scene definition!
-// #include "buildCoolScene.c"
+
+struct object3D *o;
+struct pointLS *l;
+struct point3D p;
+struct object3D *prev_object;
+struct areaLS *aLS;
+
+  switch (scene)
+  {
+  case 0:
+    #include "buildscene.c" 
+    break;
+  case 1:
+    #include "testScene3.c"
+    break;
+  case 2:
+    #include "testScene.c"
+    break;
+  default:
+    break;
+  }
+}
+void printOctTree(struct  octTreeNode* head,int depth){
+  if (depth == 0)
+  {
+    return;
+  }
+  
+  struct octTreeNode* tmp = head;
+  int count = 0;
+  while (tmp!= NULL)
+  {
+    count ++;
+    printOctTree(tmp->child,depth - 1 );
+    tmp  = tmp->next;
+    
+    
+  }
+  printf("depth : %d with %d\n ",depth,count);
+}
+
+void buildOctTreeHead(){
+  // First oct tree functio, just loops throuh all the objects and finds the biggest box that bounds all the objects 
+
+
+  struct object3D *o = object_list;
+  struct point3D p_min,p_max,p_min_tmp,p_max_tmp;
+  assignPoint(&p_min,__DBL_MAX__,__DBL_MAX__,__DBL_MAX__);
+  assignPoint(&p_max,-__DBL_MAX__,-__DBL_MAX__,-__DBL_MAX__);
+  while (o != NULL)
+  {
+    getPMinPmax(o,&p_min_tmp,&p_max_tmp);
+    assignPoint(&p_min,min(p_min.px,p_min_tmp.px),min(p_min.py,p_min_tmp.py),min(p_min.pz,p_min_tmp.pz));
+    assignPoint(&p_max,max(p_max.px,p_max_tmp.px),max(p_max.py,p_max_tmp.py),max(p_max.pz,p_max_tmp.pz));
+    o = o->next;
+  }
+
+  // struct octTreeNode* head= (struct octTreeNode*) malloc(sizeof(struct octTreeNode));
+  struct object3D* octCube = newOctCube(&p_min,&p_max);
+  
+  struct octTreeNode* head = (struct octTreeNode*) calloc(1,sizeof(struct octTreeNode));
+  
+  // insertObject(octCube, &object_list);
+  struct object3D *object_list_copy = NULL;
+  o = object_list;
+  while (o !=NULL)
+  {
+    insertObject(duplicateObj(o,1),&object_list_copy);
+    o = o->next;
+  }
+  // insertObject(octCube,&object_list);
+  head->obj_list= object_list_copy;
+  head->cube = octCube;
+  oct_tree_root = head;
+}
+
+// return true if cur_node contains some object else do nothing
+int assignObjToNode(struct octTreeNode* parent,struct octTreeNode* cur_node,struct point3D* p_min, struct point3D* p_max){
+
+  struct object3D *o = parent->obj_list;
+  struct point3D tmp_p_min;
+  struct point3D tmp_p_max;
+  int empty = 1;
+  assignPoint(&tmp_p_min,__DBL_MAX__,__DBL_MAX__,__DBL_MAX__);
+  assignPoint(&tmp_p_max,__DBL_MIN__,__DBL_MIN__,__DBL_MIN__);
+  while (o != NULL)
+  { 
+    
+
+    // if some part of object is in box we add it to the box obj list
+    if (haveOverLap(o,p_min,p_max))
+    {
+      // add it to child node
+      empty = 0;
+      struct object3D *copy_obj = duplicateObj(o,1);
+      insertObject(copy_obj,&cur_node->obj_list);
+    }
+    o = o->next;
+  }
+  return !empty;
+
+}
+
+
+void buildOctTreeChild(struct octTreeNode *head, int depth){
+  struct octTreeNode* parent = head;
+  struct object3D *tmp_cube;
+  struct point3D p_min,p_max;
+  struct octTreeNode* cur_head;
+  if (depth <= 0)
+  {
+    return;
+  }
+
+  struct octTreeNode * last_node = NULL;
+  while (parent != NULL)
+  {
+    cur_head = NULL;
+    // 4 small cubes inside big cube
+    for (int i = 0; i <=1; i++)
+    {
+      for (int j = 0; j <= 1; j++)
+      {
+        for (int o = 0; o <= 1; o++){
+           // create a duplicates node, MUST BE FREED LATER
+        tmp_cube = duplicateObj(head->cube,0);
+        tmp_cube->col.R = get_random_double(0,1);
+        tmp_cube->col.G = get_random_double(0,1);
+        tmp_cube->col.B = get_random_double(0,1);
+        Translate(tmp_cube,-1,-1,-1);
+        Scale(tmp_cube,.5,.5,.5);
+        Translate(tmp_cube,i,j,o);
+        // applye the parent translation
+        matMult(head->cube->T,tmp_cube->T);
+        invert(&tmp_cube->T[0][0], &tmp_cube->Tinv[0][0]);
+        
+        assignPoint(&p_min,-1,-1,-1);
+        assignPoint(&p_max,1,1,1);
+        
+        matVecMult(tmp_cube->T,&p_min);
+        matVecMult(tmp_cube->T,&p_max);
+        // figure out what object goes in where here
+        struct octTreeNode *cur_node = (struct octTreeNode *)calloc(1,sizeof(struct octTreeNode));
+        cur_node->cube = tmp_cube;
+        if(assignObjToNode(parent,cur_node,&p_min,&p_max)){
+      
+            buildOctTreeChild(cur_node,depth - 1);
+            if (last_node != NULL)
+            {
+              last_node->next = cur_node;
+            }else{
+              cur_head = cur_node;
+            }
+            last_node = cur_node;
+            // printf("include cub %d %d %d\n",i,j,o);
+        }else{
+          // printf("discard cub %d %d %d\n",i,j,o);
+          free(cur_node);
+        }
+        }
+       
+      }
+      
+    }
+    
+    // partition into eight dieffernt small cubes, and the for each of the small cube, we copy the objects and delte from parents
+    
+
+
+    parent->child = cur_head;
+    parent = parent->next;
+  }
+  
 }
 
 void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
@@ -129,6 +309,7 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
   struct object3D *tmp_obj;
   struct point3D tmp_p,tmp_n,s,m,c;
   double c_dot_m,n_dot_s,n_dot_s_front_back;
+  double gamma = obj->alpha; 
 
   // PLS coponent
   struct pointLS *curr_light = light_list;
@@ -139,11 +320,13 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
     subVectors(p, &p_to_ls_d);
     // normalize(&p_to_ls_d);
     struct ray3D p_to_ls;
-    initRay(&p_to_ls, p, &p_to_ls_d);
+    initRay(&p_to_ls, p, &p_to_ls_d, ray->last_r_index);
 
     // Local component
-    findFirstHit(&p_to_ls, &lambda, obj, &tmp_obj, &tmp_p, &tmp_n, &tmp_a,
-                 &tmp_b);
+    // findFirstHit(&p_to_ls, &lambda, obj, &tmp_obj, &tmp_p, &tmp_n, &tmp_a,
+    //              &tmp_b);
+    findFirstHitOctTree(oct_tree_root,&p_to_ls,&lambda, obj, &tmp_obj, &tmp_p, &tmp_n, &tmp_a,
+                 &tmp_b,OCT_TREE_DEPTH);
 
     // Ambient
     tmp_col.R += R * obj->alb.ra;
@@ -211,12 +394,15 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
       normalize(&p_to_als_d);
 
       struct ray3D r_p_to_als;
-      initRay(&r_p_to_als,p,&p_to_als_d);
+      initRay(&r_p_to_als,p,&p_to_als_d, ray->last_r_index);
 
       tmp_obj = NULL;
       lambda = -1;
-      findFirstHit(&r_p_to_als,&lambda,obj,&tmp_obj, &tmp_p, &tmp_n, &tmp_a,
-                 &tmp_b);
+
+      // findFirstHit(&r_p_to_als,&lambda,obj,&tmp_obj, &tmp_p, &tmp_n, &tmp_a,
+      //            &tmp_b);
+      findFirstHitOctTree(oct_tree_root,&r_p_to_als,&lambda,obj,&tmp_obj, &tmp_p, &tmp_n, &tmp_a,
+                 &tmp_b,OCT_TREE_DEPTH);
 
       if (tmp_obj != NULL && tmp_obj->isLightSource){
         copyPoint(&p_to_als_d, &s);
@@ -272,7 +458,7 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
       normalize(&ms_d);
       // Build ms ray
       struct ray3D ms;
-      initRay(&ms, p, &ms_d);
+      initRay(&ms, p, &ms_d, ray->last_r_index);
       // Perform raytracing using ms
       struct colourRGB c;
       rayTrace(&ms, depth + 1, &c, obj);
@@ -283,7 +469,50 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
     }
     // Refraction
     if (obj->alpha < 1) {
-      // TODO: A3
+      // adjust previously calulated by gamma
+      tmp_col.R *= gamma;
+      tmp_col.G *= gamma;
+      tmp_col.B *= gamma;
+
+       // r = c2/c1
+      normalize(&ray->d);
+      normalize(n);
+      double theta_1 = acos(dot(&ray->d,n));
+      double theta_2 = asin(sin(theta_1)/(ray->last_r_index/obj->r_index));
+      if (theta_1 > theta_2)
+      {
+      // compute d_t with equation
+      // d_t = rb + (rc - sqrt(1 - r^2(1 - c^2)))n)
+      struct point3D b,neg_n,d_t,temp;
+      double c,temp_scalar;
+      double r = obj->r_index/ray->last_r_index;
+      copyPoint(&ray->d,&b); // b = d
+      copyPoint(n,&neg_n); 
+      scaleVectors(&neg_n,-1); // neg_n = -n
+      c = dot(&neg_n,&b); // c = -n dot b
+      
+      // d_t = rb
+      copyPoint(&b,&d_t);
+      scaleVectors(&d_t,r); 
+
+      copyPoint(n,&temp);
+      temp_scalar = r*c - sqrt(1 - pow(r,2)*(1 - pow(c,2)));
+      scaleVectors(&temp,temp_scalar);
+
+      addVectors(&temp,&d_t);
+      
+      // Build ms ray
+      struct ray3D ms;
+      initRay(&ms, p, &d_t, obj->r_index);
+      // Perform raytracing using ms
+      struct colourRGB r_col;
+      rayTrace(&ms, depth + 1, &r_col, obj);
+
+      // upadte color value based on I_t
+      tmp_col.R += (1 - gamma) * r_col.R;
+      tmp_col.G += (1 - gamma) * r_col.G;
+      tmp_col.B += (1 - gamma) * r_col.B;
+     }
     }
   }
   // Update colour
@@ -292,9 +521,51 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
   col->B = min(tmp_col.B, 1);
 }
 
+
+int findFirstHitOctTree(struct octTreeNode* parent,struct ray3D *ray, double *lambda, struct object3D *Os,
+                  struct object3D **obj, struct point3D *p, struct point3D *n,
+                  double *a, double *b, int depth){
+  findFirstHit(ray,lambda,Os,obj, p,n,a,b,object_list);
+  return 1;
+
+  double curr_lambda = -1;
+  double tmp_lambda = -1;
+  struct point3D curr_p, curr_n;
+  double curr_a, curr_b;
+
+  struct octTreeNode *curr_node = parent;
+  struct octTreeNode *closest_node = NULL;
+
+  // Loop on objects to find closest one for intersection
+  while (curr_node != NULL) {
+    if (curr_node->cube == Os) {
+      curr_node= curr_node->next;
+      continue;
+    }
+
+    // Get ray intersection with current box
+    curr_node->cube->intersect(curr_node->cube, ray, &curr_lambda, &curr_p, &curr_n, &curr_a,
+                        &curr_b);
+
+    // test all the boxes I pass through
+    if(curr_lambda > 0.0){
+      if(curr_node->child == NULL){
+        findFirstHit(ray,lambda,Os,obj, p,n,a,b,curr_node->obj_list);
+      }else{
+        findFirstHitOctTree(curr_node->child,ray,lambda,Os,obj,p,n,a,b,depth-1);
+      }
+    }
+
+    curr_node = curr_node->next;
+
+   
+  
+  }
+}
+
 void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os,
                   struct object3D **obj, struct point3D *p, struct point3D *n,
-                  double *a, double *b) {
+                  double *a, double *b, struct object3D *cur_object_list) {
   // Find the closest intersection between the ray and any objects in the
   // scene. Inputs:
   //   *ray    -  A pointer to the ray being traced
@@ -325,11 +596,13 @@ void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os,
   struct point3D curr_p, curr_n;
   double curr_a, curr_b;
 
-  struct object3D *curr_obj = object_list;
+
+  struct object3D *curr_obj = cur_object_list;
 
   // Loop on objects to find closest one for intersection
   while (curr_obj != NULL) {
     if (curr_obj == Os) {
+      // printf("hitmyself\n");
       curr_obj = curr_obj->next;
       continue;
     }
@@ -367,7 +640,6 @@ void rayTrace(struct ray3D *ray, int depth, struct colourRGB *col,
   //            originates so you can discard self-intersections due to
   //            numerical errors. NULL for rays originating from the center of
   //            projection.
-
   double lambda = -1;    // Lambda at intersection
   double a, b;           // Texture coordinates
   struct object3D *obj;  // Pointer to object at intersection
@@ -389,12 +661,13 @@ void rayTrace(struct ray3D *ray, int depth, struct colourRGB *col,
   ///////////////////////////////////////////////////////
 
   // Find the first intersection of ray in the scene
-  findFirstHit(ray, &lambda, Os, &obj, &p, &n, &a, &b);
+  // findFirstHit(ray, &lambda, Os, &obj, &p, &n, &a, &b);
+  findFirstHitOctTree(oct_tree_root,ray,&lambda, Os, &obj, &p, &n, &a, &b,OCT_TREE_DEPTH);
 
   // Perform shading only if ray length is above zero
   if (lambda > 0.0) {
     rtShade(obj, &p, &n, ray, depth, a, b, &I);
-
+  
     col->R = I.R;
     col->G = I.G;
     col->B = I.B;
@@ -434,7 +707,7 @@ void * renderThreadFunc(void *vargp){
 
   for (int j = start_y; j < end_y; j++)  // For each of the pixels in the image
   {
-    printf("thread %d: %d/%d\n",args->thread_num,j-start_y,end_y-start_y);
+    // printf("thread %d: %d/%d\n",args->thread_num,j-start_y,end_y-start_y);
     for (int i = 0; i < sx; i++) {
       struct colourRGB pixel_col;
       pixel_col.R = 0;
@@ -470,7 +743,7 @@ void * renderThreadFunc(void *vargp){
       normalize(&d);
 
           // Compute ray
-          initRay(&ray, &pc, &d);
+          initRay(&ray, &pc, &d,1);
           col = background;
 
           // Perform raytracing
@@ -545,9 +818,12 @@ int main(int argc, char *argv[]) {
     antialiasing = 1;
   strcpy(&output_name[0], argv[4]);
   
-  if (argc == 6 && atoi(argv[5]) > 0)
+  if (argc >= 6 && atoi(argv[5]) > 0)
       thread_count = atoi(argv[5]);
-
+  
+  if (argc == 7 && atoi(argv[6]) > 0)
+      scene = atoi(argv[6]);
+  
   
   fprintf(stderr, "Rendering image at %d x %d\n", sx, sx);
   fprintf(stderr, "Recursion depth = %d\n", MAX_DEPTH);
@@ -577,8 +853,10 @@ int main(int argc, char *argv[]) {
   //        *interesting* scene.
   ///////////////////////////////////////////////////
   buildScene();  // Create a scene. This defines all the
-                 // objects in the world of the raytracer
-
+  //                // objects in the world of the raytracer
+  buildOctTreeHead();
+  buildOctTreeChild(oct_tree_root,OCT_TREE_DEPTH);
+  
   //////////////////////////////////////////
   // TO DO: For Assignment 2 you can use the setup
   //        already provided here. For Assignment 3
@@ -602,7 +880,7 @@ int main(int argc, char *argv[]) {
   // Camera center is at (0,0,-1)
   e.px = 0;
   e.py = 0;
-  e.pz = -1;
+  e.pz =-3;
   e.pw = 1;
 
   // To define the gaze vector, we choose a point 'pc' in the scene that

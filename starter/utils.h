@@ -23,6 +23,8 @@
 #ifndef __utils_header
 #define __utils_header
 
+#define min(A, B) ((A) < (B) ? (A) : (B))
+#define NUM_SAMPLE_OCT_TREE 1000
 // Functions to apply transformations to objects.
 // If you add any transformations to the list below, document them carefully
 inline void matMult(double A[4][4], double B[4][4])
@@ -179,6 +181,14 @@ inline void subVectors(struct point3D *a, struct point3D *b)
  b->pw=1;               // Mind the homogeneous coordinate!
 }
 
+
+inline void scaleVectors(struct point3D *a, double scaler){
+  a->px=a->px * scaler;
+  a->py=a->py * scaler;
+  a->pz=a->pz * scaler;
+  a->pw=1;
+}
+
 inline double length(struct point3D *a)
 {
  // Compute and return the length of a vector
@@ -200,7 +210,16 @@ inline void rayPosition(struct ray3D *ray, double lambda, struct point3D *pos)
  pos->pw=1;
 }
 
-inline void initRay(struct ray3D *ray, struct point3D *p0, struct point3D *d)
+inline void assignPoint(struct point3D *p0, double x, double y, double z){
+  // assign a point with value x y z w = 1;
+  p0->px = x;
+  p0->py = y;
+  p0->pz = z;
+  p0->pw = 1;
+}
+
+
+inline void initRay(struct ray3D *ray, struct point3D *p0, struct point3D *d, double last_r_index)
 {
  // Initializes the given ray3D struct with the the position
  // and direction vectors. Note that this function DOES NOT normalize
@@ -209,6 +228,26 @@ inline void initRay(struct ray3D *ray, struct point3D *p0, struct point3D *d)
  memcpy(&ray->p0,p0,sizeof(struct point3D));
  memcpy(&ray->d,d,sizeof(struct point3D));
  ray->rayPos=&rayPosition;
+ ray->last_r_index = last_r_index;
+}
+
+
+inline int haveOverLap(struct object3D*obj, struct point3D *p_min_box,struct point3D *p_max_box){\
+  double x,y,z;
+  int x_overlap,y_overlap,z_overlap;
+  for (int i = 0; i < NUM_SAMPLE_OCT_TREE; i++)
+  {
+    obj->randomPoint(obj,&x,&y,&z);
+    x_overlap = x>p_min_box->px && x < p_max_box->px;
+    y_overlap = y > p_min_box->py && y < p_max_box->py;
+    z_overlap = z > p_min_box->pz && z < p_max_box->pz;
+    if (x_overlap && y_overlap && z_overlap)
+    {
+      return 1;
+    }
+  }
+  return 0;
+  
 }
 
 // Ray and normal transformations to enable the use of canonical intersection tests with transformed objects
@@ -218,13 +257,22 @@ void normalTransform(struct point3D *n_orig, struct point3D *n_transformed, stru
 // Copy functions
 void copyPoint(struct point3D *from, struct point3D *to);
 
+void getPMinPmax(struct object3D *obj,struct point3D *p_min,struct point3D *p_max);
 // Functions to create new objects, one for each type of object implemented.
 // You'll need to add code for these functions in utils.c
 struct object3D *newPlane(double ra, double rd, double rs, double rg, double r, double g, double b, double alpha, double R_index, double shiny);
 struct object3D *newSphere(double ra, double rd, double rs, double rg, double r, double g, double b, double alpha, double R_index, double shiny);
 struct object3D *newCyl(double ra, double rd, double rs, double rg, double r, double g, double b, double alpha, double R_index, double shiny);
 struct object3D *newCone(double ra, double rd, double rs, double rg, double r, double g, double b, double alpha, double R_index, double shiny);
+struct object3D *newCube(double ra, double rd, double rs, double rg, double r, double g, double b, double alpha, double R_index, double shiny);
 struct areaLS *newALS(struct object3D *obj,int sample);
+
+
+struct object3D *duplicateObj(struct object3D* src_obj,int with_T);
+
+
+// generate a cube for oct
+struct object3D *newOctCube(struct point3D* p_min,struct point3D* p_max);
 
 // Functions to obtain surface coordinates on objects
 void planeCoordinates(struct object3D *plane, double a, double b, double *x, double *y, double *z);
@@ -235,7 +283,7 @@ void planeSample(struct object3D *plane, double *x, double *y, double *z);
 void sphereSample(struct object3D *sphere, double *x, double *y, double *z);
 void cylSample(struct object3D *cylinder, double *x, double *y, double *z);
 void coneSample(struct object3D *cone, double *x, double *y, double *z);
-
+void cubeSample(struct object3D *cube, double *x, double *y, double *z);
 
 // Functions to compute intersections for objects.
 // You'll need to add code for these in utils.c
@@ -243,6 +291,7 @@ void planeIntersect(struct object3D *plane, struct ray3D *r, double *lambda, str
 void sphereIntersect(struct object3D *sphere, struct ray3D *r, double *lambda, struct point3D *p, struct point3D *n, double *a, double *b);
 void cylIntersect(struct object3D *cylinder, struct ray3D *r, double *lambda, struct point3D *p, struct point3D *n, double *a, double *b);
 void coneIntersect(struct object3D *cone, struct ray3D *r, double *lambda, struct point3D *p, struct point3D *n, double *a, double *b);
+void cubeIntersect(struct object3D *cube, struct ray3D *r, double *lambda, struct point3D *p, struct point3D *n, double *a, double *b);
 
 // Functions to texture-map objects
 // You will need to add code for these if you implement texture mapping.

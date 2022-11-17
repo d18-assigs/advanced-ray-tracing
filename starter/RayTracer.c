@@ -79,6 +79,9 @@ struct areaLS *aLS;
   case 2:
     #include "testScene.c"
     break;
+  case 3:
+    #include "featuresScene.c"
+    break;
   default:
     break;
   }
@@ -528,8 +531,8 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
 int findFirstHitOctTree(struct octTreeNode* parent,struct ray3D *ray, double *lambda, struct object3D *Os,
                   struct object3D **obj, struct point3D *p, struct point3D *n,
                   double *a, double *b, int depth){
-  // findFirstHit(ray,lambda,Os,obj, p,n,a,b,object_list);
-  // return 1;
+  findFirstHit(ray,lambda,Os,obj, p,n,a,b,object_list);
+  return 1;
 
   double curr_lambda = -1;
   double tmp_lambda = -1;
@@ -730,7 +733,7 @@ void * renderThreadFunc(void *vargp){
 
   for (int j = start_y; j < end_y; j++)  // For each of the pixels in the image
   {
-    // printf("thread %d: %d/%d\n",args->thread_num,j-start_y,end_y-start_y);
+    printf("thread %d: %d/%d\n",args->thread_num,j-start_y,end_y-start_y);
     for (int i = 0; i < sx; i++) {
       struct colourRGB pixel_col;
       pixel_col.R = 0;
@@ -877,8 +880,8 @@ int main(int argc, char *argv[]) {
   ///////////////////////////////////////////////////
   buildScene();  // Create a scene. This defines all the
   //                // objects in the world of the raytracer
-  buildOctTreeHead();
-  buildOctTreeChild(oct_tree_root,OCT_TREE_DEPTH);
+  // buildOctTreeHead();
+  // buildOctTreeChild(oct_tree_root,OCT_TREE_DEPTH);
   
   //////////////////////////////////////////
   // TO DO: For Assignment 2 you can use the setup

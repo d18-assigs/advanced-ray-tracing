@@ -532,12 +532,22 @@ int findFirstHitOctTree(struct octTreeNode* parent,struct ray3D *ray, double *la
   double tmp_lambda = -1;
   struct point3D curr_p, curr_n;
   double curr_a, curr_b;
-
   struct octTreeNode *curr_node = parent;
   struct octTreeNode *closest_node = NULL;
+  struct point3D p_min,p_max;
+  int ray_inside_box = 0;
 
   // Loop on objects to find closest one for intersection
   while (curr_node != NULL) {
+    assignPoint(&p_min,-1,-1,-1);
+    assignPoint(&p_max,1,1,1);
+    matVecMult(curr_node->cube->T,&p_max);
+    matVecMult(curr_node->cube->T,&p_min);
+    assignPoint(&p_min,min(p_min.px,p_max.px),min(p_min.py,p_max.py),min(p_min.pz,p_max.pz));
+    assignPoint(&p_max,max(p_min.px,p_max.px),max(p_min.py,p_max.py),max(p_min.pz,p_max.pz));
+
+      
+    
     if (curr_node->cube == Os) {
       curr_node= curr_node->next;
       continue;
@@ -546,10 +556,12 @@ int findFirstHitOctTree(struct octTreeNode* parent,struct ray3D *ray, double *la
     // Get ray intersection with current box
     curr_node->cube->intersect(curr_node->cube, ray, &curr_lambda, &curr_p, &curr_n, &curr_a,
                         &curr_b);
-
+    
+    ray_inside_box = ray->p0.px > p_min.px && ray->p0.px < p_max.px && ray->p0.py > p_min.py && ray->p0.py < p_max.py && ray->p0.pz > p_min.pz && ray->p0.pz < p_max.pz; 
     // test all the boxes I pass through
-    if(curr_lambda > 0.0){
+    if(curr_lambda > 0.0 || ray_inside_box){
       if(curr_node->child == NULL){
+
         findFirstHit(ray,lambda,Os,obj, p,n,a,b,curr_node->obj_list);
       }else{
         findFirstHitOctTree(curr_node->child,ray,lambda,Os,obj,p,n,a,b,depth-1);
@@ -641,6 +653,7 @@ void rayTrace(struct ray3D *ray, int depth, struct colourRGB *col,
   //            numerical errors. NULL for rays originating from the center of
   //            projection.
   double lambda = -1;    // Lambda at intersection
+  double lambda2 = -1;
   double a, b;           // Texture coordinates
   struct object3D *obj;  // Pointer to object at intersection
   struct point3D p;      // Intersection point
@@ -661,9 +674,11 @@ void rayTrace(struct ray3D *ray, int depth, struct colourRGB *col,
   ///////////////////////////////////////////////////////
 
   // Find the first intersection of ray in the scene
-  // findFirstHit(ray, &lambda, Os, &obj, &p, &n, &a, &b);
   findFirstHitOctTree(oct_tree_root,ray,&lambda, Os, &obj, &p, &n, &a, &b,OCT_TREE_DEPTH);
+  findFirstHit(ray, &lambda2, Os, &obj, &p, &n, &a, &b,object_list);
+  
 
+  
   // Perform shading only if ray length is above zero
   if (lambda > 0.0) {
     rtShade(obj, &p, &n, ray, depth, a, b, &I);

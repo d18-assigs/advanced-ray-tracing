@@ -19,11 +19,6 @@ invert(&o->T[0][0],&o->Tinv[0][0]);
 insertObject(o,&object_list);
 
 
-o = newSphere(.05,.65,.95,.25,1,1,0,1,1,3);
-RotateX(o,PI/2);
-Translate(o,-2,0,2);
-invert(&o->T[0][0],&o->Tinv[0][0]);
-insertObject(o,&object_list);
 
 
 o = newSphere(.05,.65,.95,.25,1,1,0,1,1,3);
@@ -32,12 +27,6 @@ Translate(o,5,0,2);
 invert(&o->T[0][0],&o->Tinv[0][0]);
 insertObject(o,&object_list);
 
-
-o = newSphere(.05,.65,.95,.25,1,1,0,1,1,3);
-RotateX(o,PI/2);
-Translate(o,-1,0,2);
-invert(&o->T[0][0],&o->Tinv[0][0]);
-insertObject(o,&object_list);
 
 
 o = newSphere(.05,.65,.95,.25,1,1,0,1,1,3);
@@ -99,7 +88,7 @@ insertObject(o,&object_list);
 // //  insertObject(o,&object_list);
 
  o=newPlane(.05,.25,.05,.05,0.5,.29,.61,1,1,2);
- Scale(o,8,8,8);
+ Scale(o,22,22,22);
  Translate(o,0,0,9);
  invert(&o->T[0][0],&o->Tinv[0][0]);
  insertObject(o,&object_list);
@@ -131,7 +120,7 @@ insertObject(o,&object_list);
  // colour in terms of RGB (in [0,1]).
  p.px=-20;
  p.py=20;
- p.pz=-5;
+ p.pz=-20;
  p.pw=1;
  l=newPLS(&p,.5,.5,.5);
  insertPLS(l,&light_list);

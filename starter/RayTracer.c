@@ -50,12 +50,11 @@ struct octTreeNode* oct_tree_root;
 struct object3D *object_list = NULL;
 struct pointLS *light_list = NULL;
 struct areaLS *aLS_list = NULL;
-struct octTreeNode *node_list = NULL;
 struct textureNode *texture_list;
 int MAX_DEPTH;
 int MAX_FORWARD_DEPTH = 2;
 int num_spaces = 0;
-#define OCT_TREE_DEPTH 4
+#define OCT_TREE_DEPTH 3
 
 int scene = 0;
 
@@ -207,7 +206,11 @@ void buildOctTreeChild(struct octTreeNode *head, int depth){
         struct octTreeNode *cur_node = (struct octTreeNode *)calloc(1,sizeof(struct octTreeNode));
         cur_node->cube = tmp_cube;
         if(assignObjToNode(parent,cur_node,&p_min,&p_max)){
-      
+            // if (depth== 1)
+            // {
+            //   insertObject(cur_node->cube,&object_list);
+            // }
+            
             buildOctTreeChild(cur_node,depth - 1);
             if (last_node != NULL)
             {
@@ -525,8 +528,8 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
 int findFirstHitOctTree(struct octTreeNode* parent,struct ray3D *ray, double *lambda, struct object3D *Os,
                   struct object3D **obj, struct point3D *p, struct point3D *n,
                   double *a, double *b, int depth){
-  findFirstHit(ray,lambda,Os,obj, p,n,a,b,object_list);
-  return 1;
+  // findFirstHit(ray,lambda,Os,obj, p,n,a,b,object_list);
+  // return 1;
 
   double curr_lambda = -1;
   double tmp_lambda = -1;
@@ -559,7 +562,7 @@ int findFirstHitOctTree(struct octTreeNode* parent,struct ray3D *ray, double *la
     
     ray_inside_box = ray->p0.px > p_min.px && ray->p0.px < p_max.px && ray->p0.py > p_min.py && ray->p0.py < p_max.py && ray->p0.pz > p_min.pz && ray->p0.pz < p_max.pz; 
     // test all the boxes I pass through
-    if(curr_lambda > 0.0 || ray_inside_box){
+    if(curr_lambda > 0.0 ){
       if(curr_node->child == NULL){
 
         findFirstHit(ray,lambda,Os,obj, p,n,a,b,curr_node->obj_list);
@@ -567,6 +570,11 @@ int findFirstHitOctTree(struct octTreeNode* parent,struct ray3D *ray, double *la
         findFirstHitOctTree(curr_node->child,ray,lambda,Os,obj,p,n,a,b,depth-1);
       }
     }
+    if ( ray_inside_box)
+    {
+      findFirstHitOctTree(curr_node->child,ray,lambda,Os,obj,p,n,a,b,depth-1);
+    }
+    
 
     curr_node = curr_node->next;
 

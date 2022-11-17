@@ -138,6 +138,9 @@ struct object3D {
   // Alpha mapping similar as above but with opacity
   void (*alphaMap)(struct image *img, double a, double b, double *alpha);
 
+  // Alpha mapping similar as above but with opacity
+  int (*overlap)(struct object3D *obj,double x, double y, double z);
+
   // Functions to return coordinates on the surface of the object. One takes as
   // input the a and b parameters for the parametric function of the object and
   // returns the (x,y,z) coordinates on the object surface. The second returns a

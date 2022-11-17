@@ -26,7 +26,7 @@ Translate(o, 0, 2, 7);
 invert(&o->T[0][0], &o->Tinv[0][0]);
 insertObject(o, &object_list); 
 prev_object = o;
-hierachycal_shpere(prev_object,2,.3,&object_list);
+fractal_sphere(prev_object,2,.3,&object_list);
 
 o = newCone(.05, .95, .35, .35, 1, .25, .25, 1, 1, 6);
 Scale(o,1,1,5);

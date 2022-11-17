@@ -24,7 +24,6 @@
 #define PI 3.14159265354
 #define ANTIALIASING_SAMPLES \
   2  // How many samples to perform on each axis, number must be above 1
-
 /* The structure below is used to hold a single RGB image. 'rgbdata' points */
 /* to an array of size sx*sy*[num layers] but note that your code must know */
 /* the data type for the array. Within the raytracer, there will be double  */

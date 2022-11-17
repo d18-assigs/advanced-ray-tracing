@@ -46,7 +46,7 @@
 
 // A couple of global structures and data: An object list, a light list, and the
 // maximum recursion depth
-struct octTreeNode* oct_tree_root;
+struct octTreeNode* oct_tree_root = NULL;
 struct object3D *object_list = NULL;
 struct pointLS *light_list = NULL;
 struct areaLS *aLS_list = NULL;
@@ -54,10 +54,8 @@ struct textureNode *texture_list;
 int MAX_DEPTH;
 int MAX_FORWARD_DEPTH = 2;
 int num_spaces = 0;
-#define OCT_TREE_DEPTH 3
-
-int scene = 0;
-
+int scene = -1;
+int withRTAccel = 0;
 
 
 void buildScene(void) {
@@ -77,12 +75,16 @@ struct areaLS *aLS;
   #include "ALSplane.c" 
   break;
   case 2:
-    #include "testScene.c"
+    #include "ALSsphere.c"
     break;
   case 3:
     #include "featuresScene.c"
     break;
+  case 4:
+    #include "CoolScene!!.c"
+    break;
   default:
+    #include "testScene.c"
     break;
   }
 }
@@ -122,7 +124,7 @@ void buildOctTreeHead(){
   }
 
   // struct octTreeNode* head= (struct octTreeNode*) malloc(sizeof(struct octTreeNode));
-  struct object3D* octCube = newOctCube(&p_min,&p_max);
+  struct object3D* octCube = newOutermostOctCube(&p_min,&p_max);
   
   struct octTreeNode* head = (struct octTreeNode*) calloc(1,sizeof(struct octTreeNode));
   
@@ -282,6 +284,7 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
 
 
 
+
   if (obj->texImg == NULL)  // Not textured, use object colour
   {
     R = obj->col.R;
@@ -296,7 +299,17 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
 
   // Apply normal mapping
   if (obj->normalMapped) {
-    obj->textureMap(obj->normalMap, a, b, &n->px, &n->py, &n->pz);
+  struct point3D n_displacement;
+    obj->textureMap(obj->normalMap, a, b, &n_displacement.px, &n_displacement.py, &n_displacement.pz);
+    struct point3D up,deviated_up;
+    assignPoint(&up,0,0,1);
+    assignPoint(&deviated_up,0.5 - n_displacement.px, 0.5 - n_displacement.py,1);
+    double R[4][4];
+    double R_inv[4][4];
+    getRotationalMatrix(n,&up,&R[0][0]);
+    invert(&R[0][0],&R_inv[0][0]);
+    matVecMult(R_inv,&deviated_up);
+    copyPoint(&deviated_up,n);
   }
 
   // Apply alpha mapping
@@ -531,28 +544,22 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
 int findFirstHitOctTree(struct octTreeNode* parent,struct ray3D *ray, double *lambda, struct object3D *Os,
                   struct object3D **obj, struct point3D *p, struct point3D *n,
                   double *a, double *b, int depth){
-  findFirstHit(ray,lambda,Os,obj, p,n,a,b,object_list);
-  return 1;
+  if (!withRTAccel)
+  {
+    findFirstHit(ray,lambda,Os,obj, p,n,a,b,object_list);
+    return 1;
+  }
+                    
 
   double curr_lambda = -1;
-  double tmp_lambda = -1;
   struct point3D curr_p, curr_n;
   double curr_a, curr_b;
   struct octTreeNode *curr_node = parent;
   struct octTreeNode *closest_node = NULL;
   struct point3D p_min,p_max;
-  int ray_inside_box = 0;
 
   // Loop on objects to find closest one for intersection
   while (curr_node != NULL) {
-    assignPoint(&p_min,-1,-1,-1);
-    assignPoint(&p_max,1,1,1);
-    matVecMult(curr_node->cube->T,&p_max);
-    matVecMult(curr_node->cube->T,&p_min);
-    assignPoint(&p_min,min(p_min.px,p_max.px),min(p_min.py,p_max.py),min(p_min.pz,p_max.pz));
-    assignPoint(&p_max,max(p_min.px,p_max.px),max(p_min.py,p_max.py),max(p_min.pz,p_max.pz));
-
-      
 
     // Get ray intersection with current box
     curr_node->cube->intersect(curr_node->cube, ray, &curr_lambda, &curr_p, &curr_n, &curr_a,
@@ -561,14 +568,11 @@ int findFirstHitOctTree(struct octTreeNode* parent,struct ray3D *ray, double *la
     // test all the boxes I pass through
     if(curr_lambda > 0.0 ){
       if(curr_node->child == NULL){
-
         findFirstHit(ray,lambda,Os,obj, p,n,a,b,curr_node->obj_list);
       }else{
         findFirstHitOctTree(curr_node->child,ray,lambda,Os,obj,p,n,a,b,depth-1);
       }
     }
-
-
     curr_node = curr_node->next;
 
    
@@ -676,14 +680,16 @@ void rayTrace(struct ray3D *ray, int depth, struct colourRGB *col,
 
   // Find the first intersection of ray in the scene
   findFirstHitOctTree(oct_tree_root,ray,&lambda, Os, &obj, &p, &n, &a, &b,OCT_TREE_DEPTH);
-  findFirstHit(ray, &lambda2, Os, &obj, &p, &n, &a, &b,object_list);
   
 
-  
+  /* start of testing code */
+
+  /* */
   // Perform shading only if ray length is above zero
   if (lambda > 0.0) {
     rtShade(obj, &p, &n, ray, depth, a, b, &I);
-  
+
+    
     col->R = I.R;
     col->G = I.G;
     col->B = I.B;
@@ -723,7 +729,7 @@ void * renderThreadFunc(void *vargp){
 
   for (int j = start_y; j < end_y; j++)  // For each of the pixels in the image
   {
-    printf("thread %d: %d/%d\n",args->thread_num,j-start_y,end_y-start_y);
+    // printf("thread %d: %d/%d\n",args->thread_num,j-start_y,end_y-start_y);
     for (int i = 0; i < sx; i++) {
       struct colourRGB pixel_col;
       pixel_col.R = 0;
@@ -870,8 +876,13 @@ int main(int argc, char *argv[]) {
   ///////////////////////////////////////////////////
   buildScene();  // Create a scene. This defines all the
   //                // objects in the world of the raytracer
-  // buildOctTreeHead();
-  // buildOctTreeChild(oct_tree_root,OCT_TREE_DEPTH);
+  if (withRTAccel)
+  {
+    buildOctTreeHead();
+    buildOctTreeChild(oct_tree_root,OCT_TREE_DEPTH);
+  }
+  
+  
   
   //////////////////////////////////////////
   // TO DO: For Assignment 2 you can use the setup
@@ -896,7 +907,7 @@ int main(int argc, char *argv[]) {
   // Camera center is at (0,0,-1)
   e.px = 0;
   e.py = 0;
-  e.pz =-3;
+  e.pz =-1;
   e.pw = 1;
 
   // To define the gaze vector, we choose a point 'pc' in the scene that
@@ -1046,7 +1057,7 @@ int main(int argc, char *argv[]) {
      threadArgs->rgbIm = rgbIm;
      threadArgs->sx = sx;
      start_y += steps;
-     printf("\n\n********* running thread %d ********* \n\n", i + 1);
+    //  printf("\n\n********* running thread %d ********* \n\n", i + 1);
      pthread_create(&pthreads[i],NULL,renderThreadFunc,
          (void *) threadArgs);
    }

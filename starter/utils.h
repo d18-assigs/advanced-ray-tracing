@@ -25,6 +25,10 @@
 
 #define min(A, B) ((A) < (B) ? (A) : (B))
 #define NUM_SAMPLE_OCT_TREE 1000
+#define OCT_TREE_DEPTH 3
+#define CUBE_ZERO_PERC .1
+#define FIRST_CUBE_MARGINS 2
+
 // Functions to apply transformations to objects.
 // If you add any transformations to the list below, document them carefully
 inline void matMult(double A[4][4], double B[4][4])
@@ -107,7 +111,9 @@ void ScaleMat(double T[4][4], double sx, double sy, double sz);	// 3D non-unifor
 void RotateX(struct object3D *o, double theta);			// X-axis rotation by theta radians
 void RotateY(struct object3D *o, double theta);			// Y-axis rotation by theta radians
 void RotateZ(struct object3D *o, double theta);			// Z-axis rotation by theta radians
-void RotateToVec(struct object3D *o, struct point3D *s,struct point3D *d); //rotate such taht vector s is parallel with vector d
+void RotateObjToVec(struct object3D *o, struct point3D *s,struct point3D *d); //rotate such taht vector s is parallel with vector d
+void RotateVecToVec(struct point3D *s, struct point3D *d);
+void getRotationalMatrix(struct point3D *s, struct point3D *d, double *T);
 void Translate(struct object3D *o, double tx, double ty, double tz);	// 3D translation
 void Scale(struct object3D *o, double sx, double sy, double sz);	// 3D non-uniform scaling
 void printmatrix(double mat[4][4]);
@@ -263,7 +269,7 @@ struct object3D *duplicateObj(struct object3D* src_obj,int with_T);
 
 
 // generate a cube for oct
-struct object3D *newOctCube(struct point3D* p_min,struct point3D* p_max);
+struct object3D *newOutermostOctCube(struct point3D* p_min,struct point3D* p_max);
 
 // Functions to obtain surface coordinates on objects
 void planeCoordinates(struct object3D *plane, double a, double b, double *x, double *y, double *z);
@@ -318,5 +324,5 @@ void cleanup(struct object3D *o_list, struct pointLS *l_list, struct textureNode
 
 
 // hierachycal generation function
-void hierachycal_shpere(struct object3D *prev_o, int depth, double r, struct object3D **list, struct textureNode **textureList);
+void fractal_sphere(struct object3D *prev_o, int depth, double r, struct object3D **list, struct textureNode **textureList);
 #endif

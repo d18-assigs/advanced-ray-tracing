@@ -34,6 +34,7 @@
 
 #include "utils.h"
 
+double smallest_cube_size;
 // A useful 4x4 identity matrix which can be used at any point to
 // initialize or reset object transformations
 double eye4x4[4][4] = {{1.0, 0.0, 0.0, 0.0},
@@ -238,12 +239,12 @@ int haveOverLap(struct object3D *obj, struct point3D *p_min_box, struct point3D 
     int box_in_obj;
     for (int i = 0; i < NUM_SAMPLE_OCT_TREE; i++) {
         obj->randomPoint(obj, &x, &y, &z);
-            assignPoint(&tmp_min, min(tmp_min.px, x), min(tmp_min.py, y), min(tmp_min.pz, z));
-            assignPoint(&tmp_max, max(tmp_max.px, x), max(tmp_max.py, y), max(tmp_max.pz, z));
-            x_overlap = x > p_min_box->px && x < p_max_box->px;
-            y_overlap = y > p_min_box->py && y < p_max_box->py;
-            z_overlap = z > p_min_box->pz && z < p_max_box->pz;
-            obj_in_box = x_overlap && y_overlap && z_overlap;
+        assignPoint(&tmp_min, min(tmp_min.px, x), min(tmp_min.py, y), min(tmp_min.pz, z));
+        assignPoint(&tmp_max, max(tmp_max.px, x), max(tmp_max.py, y), max(tmp_max.pz, z));
+        x_overlap = x > p_min_box->px && x < p_max_box->px;
+        y_overlap = y > p_min_box->py && y < p_max_box->py;
+        z_overlap = z > p_min_box->pz && z < p_max_box->pz;
+        obj_in_box = x_overlap && y_overlap && z_overlap;
         if (obj->overlap != NULL) {
             struct point3D tmp_min, tmp_max;
             int x_overlap, y_overlap, z_overlap;
@@ -252,15 +253,13 @@ int haveOverLap(struct object3D *obj, struct point3D *p_min_box, struct point3D 
             y = get_random_double(p_min_box->py, p_max_box->py);
             z = get_random_double(p_min_box->pz, p_max_box->pz);
             box_in_obj = obj->overlap(obj, x, y, z);
-            if (obj_in_box || box_in_obj)
-            {
-              return 1;
+            if (obj_in_box || box_in_obj) {
+                return 1;
             }
-        }else{
-          if (obj_in_box)
-          {
-            return 1;
-          }
+        } else {
+            if (obj_in_box) {
+                return 1;
+            }
         }
     }
     return 0;
@@ -408,19 +407,19 @@ struct object3D *newCone(double ra, double rd, double rs, double rg, double r,
     return (cone);
 }
 
-struct object3D *newOctCube(struct point3D *p_min, struct point3D *p_max) {
+struct object3D *newOutermostOctCube(struct point3D *p_min, struct point3D *p_max) {
 
     double dis_x, dis_y, dis_z;
-    dis_x = p_min->px;
-    dis_y = p_min->py;
-    dis_z = p_min->pz;
+    dis_x = p_min->px - FIRST_CUBE_MARGINS;
+    dis_y = p_min->py - FIRST_CUBE_MARGINS;
+    dis_z = p_min->pz - FIRST_CUBE_MARGINS;
 
     double scale;
-    scale = (p_max->px - p_min->px) / 2;
-    scale = max((p_max->py - p_min->py) / 2, scale);
-    scale = max((p_max->pz - p_min->pz) / 2, scale);
+    scale = (p_max->px - dis_x) / 2;
+    scale = max((p_max->py - dis_x) / 2, scale);
+    scale = max((p_max->pz - dis_x) / 2, scale);
 
-    printf("scaling by: %f\n and x y z %f %f %f\n", scale, dis_x, dis_y, dis_z);
+    smallest_cube_size = scale * pow(0.5,OCT_TREE_DEPTH - 1);
 
     struct object3D *cube = newCube(.05, .95, .35, .35, .5, .5, .5, .5, .6, 1);
     Translate(cube, 1, 1, 1);
@@ -468,7 +467,7 @@ struct object3D *duplicateObj(struct object3D *src_obj, int with_T) {
     // return newCube(src->alb.ra,src->alb.rd,src->alb.rs,src->alb.rg,src->col.R,src->col.G,src->col.B,src->alpha,src->r_index,src->shinyness);
     struct object3D *newObject = (struct object3D *)calloc(1, sizeof(struct object3D));
     if (!newObject)
-        fprintf(stderr, "Unable to allocate new sphere, out of memory!\n");
+        fprintf(stderr, "Unable to allocate new object, out of memory!\n");
     else {
         newObject->alb.ra = src_obj->alb.ra;
         newObject->alb.rd = src_obj->alb.rd;
@@ -498,7 +497,7 @@ struct object3D *duplicateObj(struct object3D *src_obj, int with_T) {
             memcpy(&newObject->Tinv[0][0], &eye4x4[0][0], 16 * sizeof(double));
         }
 
-        newObject->textureMap = &texMap;
+        newObject->textureMap = src_obj->textureMap;
         newObject->frontAndBack = src_obj->frontAndBack;
         newObject->photonMapped = src_obj->photonMapped;
         newObject->normalMapped = src_obj->normalMapped;
@@ -616,7 +615,10 @@ void cubeIntersect(struct object3D *cube, struct ray3D *ray, double *lambda, str
     tmax = min(min(max(t1, t2), max(t3, t4)), max(t5, t6));
 
     if (tmax > 0 && tmin < tmax) {
-        *lambda = tmin;
+        if (tmin < 0) {
+            *lambda = tmax;
+        } else
+            *lambda = tmin;
         struct point3D tmp_p, tmp_n;
         rayPosition(&ray_transformed, *lambda, &tmp_p);
 
@@ -1435,9 +1437,9 @@ void RotateZ(struct object3D *o, double theta) {
     matMult(R, o->T);
 }
 
-void RotateToVec(struct object3D *o, struct point3D *s, struct point3D *d) {
+void RotateObjToVec(struct object3D *o, struct point3D *s, struct point3D *d) {
+    
     // apply rotation matrix to o such that vector s aligns with vector d
-
     struct point3D temp_s, temp_d;
     copyPoint(s, &temp_s);
     copyPoint(d, &temp_d);
@@ -1489,6 +1491,126 @@ void RotateToVec(struct object3D *o, struct point3D *s, struct point3D *d) {
     // R = R + Vx2
     matAdd(Vx2, R);
     matMult(R, o->T);
+
+    free(v);
+}
+
+
+
+void RotateVecToVec(struct point3D *s, struct point3D *d){
+    // apply rotation matrix to o such that vector s aligns with vector d
+    struct point3D temp_s, temp_d;
+    copyPoint(s, &temp_s);
+    copyPoint(d, &temp_d);
+    temp_s.pw = 0;
+    temp_d.pw = 0;
+    normalize(&temp_s);
+    normalize(&temp_d);
+
+    struct point3D *v = cross(&temp_s, &temp_d);
+    double c = dot(&temp_s, &temp_d);
+
+    double R[4][4];
+    memset(&R[0][0], 0, 16 * sizeof(double));
+    double Vx[4][4];
+    memset(&Vx[0][0], 0, 16 * sizeof(double));
+    double Vx2[4][4];
+    memset(&Vx[0][0], 0, 16 * sizeof(double));
+
+    // Calculation credit:
+    // R = I + Vx + Vx^2*(1/(1+c))
+    // https://math.stackexchange.com/questions/180418/calculate-rotation-matrix-to-align-vector-a-to-vector-b-in-3d
+
+    // 3x3 on top left corner
+    Vx[0][1] = -v->pz;
+    Vx[0][2] = v->py;
+    Vx[1][0] = v->pz;
+    Vx[1][2] = -v->px;
+    Vx[2][0] = -v->py;
+    Vx[2][1] = v->px;
+
+    // identity R
+    R[0][0] = 1;
+    R[1][1] = 1;
+    R[2][2] = 1;
+    R[3][3] = 1.0;
+
+    // Vx2 = Vx
+    memcpy(Vx2, Vx, 16 * sizeof(double));
+
+    // Vx2 = Vx2^2
+    matMult(Vx2, Vx2);
+
+    // Vx2 = 1/(1+c) * Vx2
+    matScaMult(Vx2, 1 / (1 + c));
+
+    // R = R + Vx
+    matAdd(Vx, R);
+
+    // R = R + Vx2
+    matAdd(Vx2, R);
+    free(v);
+
+    matVecMult(R,d);
+}
+
+
+
+
+void getRotationalMatrix(struct point3D *s, struct point3D *d, double *T){
+    
+    // apply rotation matrix to o such that vector s aligns with vector d
+    struct point3D temp_s, temp_d;
+    copyPoint(s, &temp_s);
+    copyPoint(d, &temp_d);
+    temp_s.pw = 0;
+    temp_d.pw = 0;
+    normalize(&temp_s);
+    normalize(&temp_d);
+
+    struct point3D *v = cross(&temp_s, &temp_d);
+    double c = dot(&temp_s, &temp_d);
+
+    double R[4][4];
+    memset(&R[0][0], 0, 16 * sizeof(double));
+    double Vx[4][4];
+    memset(&Vx[0][0], 0, 16 * sizeof(double));
+    double Vx2[4][4];
+    memset(&Vx[0][0], 0, 16 * sizeof(double));
+
+    // Calculation credit:
+    // R = I + Vx + Vx^2*(1/(1+c))
+    // https://math.stackexchange.com/questions/180418/calculate-rotation-matrix-to-align-vector-a-to-vector-b-in-3d
+
+    // 3x3 on top left corner
+    Vx[0][1] = -v->pz;
+    Vx[0][2] = v->py;
+    Vx[1][0] = v->pz;
+    Vx[1][2] = -v->px;
+    Vx[2][0] = -v->py;
+    Vx[2][1] = v->px;
+
+    // identity R
+    R[0][0] = 1;
+    R[1][1] = 1;
+    R[2][2] = 1;
+    R[3][3] = 1.0;
+
+    // Vx2 = Vx
+    memcpy(Vx2, Vx, 16 * sizeof(double));
+
+    // Vx2 = Vx2^2
+    matMult(Vx2, Vx2);
+
+    // Vx2 = 1/(1+c) * Vx2
+    matScaMult(Vx2, 1 / (1 + c));
+
+    // R = R + Vx
+    matAdd(Vx, R);
+
+    // R = R + Vx2
+    matAdd(Vx2, R);
+    memcpy(T,R,16 * sizeof(double));
 
     free(v);
 }
@@ -1966,7 +2088,7 @@ void cleanup(struct object3D *o_list, struct pointLS *l_list,
     }
 }
 
-void hierachycal_shpere(struct object3D *prev_o, int depth, double r, struct object3D **list, struct textureNode **textureList) {
+void fractal_sphere(struct object3D *prev_o, int depth, double r, struct object3D **list, struct textureNode **textureList) {
     // a hierarchical sphere generation script that generate child shperes around the parent spheres
 
     if (depth <= 0) {
@@ -1995,22 +2117,22 @@ void hierachycal_shpere(struct object3D *prev_o, int depth, double r, struct obj
             p.py = (1 + r) * sin(phi) * sin(theta);
             p.pz = (1 + r) * cos(phi);
             p.pw = 0;
-            cur_object = i == 0 ? newSphere(.05, .3, .3, .13, 0, .18, .58, .6, 1.5, 2) : newSphere(.05, .3, .3, .75, 0, .18, .58, .6, 1.5, 2);
+            cur_object = duplicateObj(prev_o, 0);
             struct point3D up;
             up.px = 0;
             up.py = 0;
             up.pz = 1;
             up.pw = 0;
-            RotateToVec(cur_object, &up, &p);
+            RotateObjToVec(cur_object, &up, &p);
             Scale(cur_object, r, r, r);
             Translate(cur_object, p.px, p.py, p.pz);
             matMult(prev_o->T, cur_object->T);
             invert(&cur_object->T[0][0], &cur_object->Tinv[0][0]);
-            loadTexture(cur_object,"./Texture/n_wood.ppm",2,textureList);
-            loadTexture(cur_object,"./Texture/t_wood.ppm",1,textureList);
+            // loadTexture(cur_object,"./Texture/n_wood.ppm",2,textureList);
+            // loadTexture(cur_object,"./Texture/t_wood.ppm",1,textureList);
             insertObject(cur_object, list);
             // recursive call
-            hierachycal_shpere(cur_object, depth - 1, r, list, textureList);
+            fractal_sphere(cur_object, depth - 1, r, list, textureList);
         }
     }
 }

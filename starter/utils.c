@@ -1124,6 +1124,9 @@ void texMap(struct image *img, double a, double b, double *R, double *G,
     // https://cseweb.ucsd.edu/classes/wi18/cse167-a/lec9.pdf Slide 11 All
     // variables defined below are corresponding to the reference above
 
+    a = max(0, min(a, 1));
+    b = max(0, min(b, 1));
+
     // Texture image
     double *img_rgb = (double *)img->rgbdata;
 
@@ -1140,12 +1143,19 @@ void texMap(struct image *img, double a, double b, double *R, double *G,
 
     // Precalculation to avoid rerunning this code below. The essence is to end up
     // with the correct pixel in the texture image by adding tx_img to sx
-    int t0_img = t0 * img->sx - 1;
-    int t1_img = t1 * img->sx - 1;
+    int t0_img = max(t0 * img->sx - 1, 0);
+    int t1_img = max(t1 * img->sx - 1, 0);
+    
 
     // Ratios in s and t directions
     double rs = ((double)(s - s0)) / ((double)(s1 - s0));
     double rt = ((double)(t - t0)) / ((double)(t1 - t0));
+
+    // If bounding pixel is the same on either axis to prevent division by zero
+    if (s1 - s0 < 1) rs = 1;
+    if (t1 - t0 < 1) rt = 1;
+
+    // printf("a=%f b=%f s=%f t=%f s0=%d s1=%d t0=%d t1=%d t0_img=%d t1_img%d rs=%f rt=%f\n", a, b, s, t, s0, s1, t0, t1, t0_img, t1_img, rs, rt);
 
     // Calculate top and bottom ratio for all colours
     double ctop_r = *(img_rgb + (t1_img + s0) * 3) * (1.0 - rs) +

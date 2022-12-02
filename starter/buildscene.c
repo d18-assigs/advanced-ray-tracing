@@ -54,7 +54,7 @@
 
  // That's it for defining a single sphere... let's add a couple more objects
 //  0, 46, 148
- o=newSphere(.05,.95,.95,.75,0,.18,.58,1,1,6);
+ o=newSphere(.05,.95,.95,.75,0,.18,.2,1,1,6);
  Scale(o,.95,1.65,.65);
  RotateZ(o,-PI/1.5);
  Translate(o,-2.2,1.75,1.35);

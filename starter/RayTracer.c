@@ -68,7 +68,7 @@ struct areaLS *aLS;
 
   switch (scene)
   {
-  case 0:
+  case 5:
     #include "ALScylinder.c" 
     break;
   case 1:
@@ -299,18 +299,19 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,
 
   // Apply normal mapping
   if (obj->normalMapped) {
-  struct point3D n_displacement;
+   struct point3D n_displacement;
     obj->textureMap(obj->normalMap, a, b, &n_displacement.px, &n_displacement.py, &n_displacement.pz);
     struct point3D up,deviated_up;
     assignPoint(&up,0,0,1);
     assignPoint(&deviated_up,0.5 - n_displacement.px, 0.5 - n_displacement.py,1);
+    // printf("%f %f %f\n",deviated_up.px,deviated_up.py,deviated_up.pz);
     double R[4][4];
     double R_inv[4][4];
     getRotationalMatrix(n,&up,&R[0][0]);
     invert(&R[0][0],&R_inv[0][0]);
     matVecMult(R_inv,&deviated_up);
     copyPoint(&deviated_up,n);
-  }
+    }
 
   // Apply alpha mapping
   if (obj->alphaMapped) {
@@ -549,7 +550,7 @@ int findFirstHitOctTree(struct octTreeNode* parent,struct ray3D *ray, double *la
     findFirstHit(ray,lambda,Os,obj, p,n,a,b,object_list);
     return 1;
   }
-                    
+  printf("I shouldn't be here\n\n\n\n\n")  ;
 
   double curr_lambda = -1;
   struct point3D curr_p, curr_n;
@@ -729,7 +730,7 @@ void * renderThreadFunc(void *vargp){
 
   for (int j = start_y; j < end_y; j++)  // For each of the pixels in the image
   {
-    // printf("thread %d: %d/%d\n",args->thread_num,j-start_y,end_y-start_y);
+    printf("thread %d: %d/%d\n",args->thread_num,j-start_y,end_y-start_y);
     for (int i = 0; i < sx; i++) {
       struct colourRGB pixel_col;
       pixel_col.R = 0;
@@ -1057,7 +1058,7 @@ int main(int argc, char *argv[]) {
      threadArgs->rgbIm = rgbIm;
      threadArgs->sx = sx;
      start_y += steps;
-    //  printf("\n\n********* running thread %d ********* \n\n", i + 1);
+     printf("\n\n********* running thread %d ********* \n\n", i + 1);
      pthread_create(&pthreads[i],NULL,renderThreadFunc,
          (void *) threadArgs);
    }

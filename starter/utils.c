@@ -570,8 +570,8 @@ void planeIntersect(struct object3D *plane, struct ray3D *ray, double *lambda,
     // Ensure it occurrs within the plane
     if (p->px < 1 && p->px > -1 && p->py < 1 && p->py > -1) {
         *lambda = curr_lambda;
-        *a = (p->px + 1) / 2;
-        *b = (p->py + 1) / 2;
+        *a = - (p->px - 1) / 2;
+        *b = - (p->py - 1) / 2;
 
         normalTransform(&normal, n, plane);
         normalize(n);
@@ -720,6 +720,7 @@ void cylIntersect(struct object3D *cylinder, struct ray3D *ray, double *lambda,
     struct point3D test_p_1, test_p_2, test_p_3, test_p_4;
     struct point3D orig_n;
     double A, B, C, D;
+    int side  = 0;
     A = pow(ray_transformed.d.px, 2) + pow(ray_transformed.d.py, 2);
     B = 2 * (ray_transformed.p0.px * ray_transformed.d.px + ray_transformed.p0.py * ray_transformed.d.py);
     C = -1 + pow(ray_transformed.p0.px, 2) + pow(ray_transformed.p0.py, 2);
@@ -754,12 +755,18 @@ void cylIntersect(struct object3D *cylinder, struct ray3D *ray, double *lambda,
         copyPoint(&test_p_1, &orig_n);
         orig_n.pz = 0;
         intersect_success = true;
+        side = 1;
+        *a = (atan(test_p_1.px / test_p_1.py) + PI/2 ) / PI;  
+        *b = (test_p_1.pz + 1.0 ) / 2.0;
     }
     if (test_p_2.pz >= -1 && test_p_2.pz <= 1 && lambda2 > 0 && lambda2 < min_lambda) {
         min_lambda = lambda2;
         copyPoint(&test_p_2, &orig_n);
         orig_n.pz = 0;
         intersect_success = true;
+        side = 1;
+        *a = (atan(test_p_2.px / test_p_2.py) + PI/2 ) / PI;  
+        *b = (test_p_2.pz + 1.0 ) / 2.0;
     }
 
     // test top x^2 + y^2 <=1
@@ -770,6 +777,9 @@ void cylIntersect(struct object3D *cylinder, struct ray3D *ray, double *lambda,
         orig_n.pz = 1;
         orig_n.pw = 1;
         intersect_success = true;
+        side = 0;
+        *a = (test_p_3.px + 1) / 2;
+        *b = (test_p_3.py + 1) / 2;
     }
 
     // test bottom x^2 + y^2 <=1
@@ -780,7 +790,11 @@ void cylIntersect(struct object3D *cylinder, struct ray3D *ray, double *lambda,
         orig_n.pz = -1;
         orig_n.pw = 1;
         intersect_success = true;
+        side = 0;
+        *a = (test_p_4.px + 1) / 2;
+        *b = (test_p_4.py + 1) / 2;
     }
+
     if (intersect_success) {
         // Within cylinder height
         *lambda = min_lambda;
@@ -789,9 +803,6 @@ void cylIntersect(struct object3D *cylinder, struct ray3D *ray, double *lambda,
         normalize(n);
 
         ray->rayPos(ray, *lambda, p);
-
-        *a = atan(p->px / p->py);
-        *b = p->pz;
     }
 }
 
